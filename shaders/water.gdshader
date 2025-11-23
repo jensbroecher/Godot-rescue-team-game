@@ -57,6 +57,7 @@ uniform float border_far = 300.0;
 
 uniform float cut_out_x = 0.0;
 uniform float cut_out_z = 0.0;
+uniform float fade_distance : hint_range(0.0, 1.0) = 0.1;
 
 // ripple uniforms removed for simpler ocean
 
@@ -262,5 +263,15 @@ void fragment()
 	METALLIC = metallic;
 	ROUGHNESS = roughness;
 	NORMAL = normal_blend;
-	ALPHA = surface_alpha;
+	
+	// Fade edges
+	float dist_from_center = distance(vertex_uv, vec2(0.0)); // vertex_uv is centered around 0,0 for the plane? No, let's check vertex shader.
+    // vertex_uv calculation: vertex_uv = (MODEL_MATRIX * vec4(local_position, 1.0)).xz / object_scale;
+    // This seems to be world space UVs or something similar.
+    // Let's use UV instead which is standard texture coordinates for the mesh.
+    
+    float uv_dist = distance(UV, vec2(0.5));
+    float fade = 1.0 - smoothstep(0.5 - fade_distance, 0.5, uv_dist);
+    
+	ALPHA = surface_alpha * fade;
 }

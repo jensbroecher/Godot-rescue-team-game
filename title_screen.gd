@@ -16,7 +16,13 @@ func _ready() -> void:
 	
 
 func _on_start_button_pressed() -> void:
-	print("Start pressed - changing to Stage1")
+	print("Start pressed - playing sound")
+	var sound = $ConfirmSound
+	if sound:
+		sound.play()
+		await sound.finished
+	
+	print("Changing to Stage1")
 	var err = get_tree().change_scene_to_file("res://Stage1.tscn")
 	if err != OK:
 		push_error("Failed to change scene to Stage1.tscn: %s" % err)
