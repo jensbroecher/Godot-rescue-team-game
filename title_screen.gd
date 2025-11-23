@@ -11,6 +11,9 @@ func _ready() -> void:
 	if settings_btn:
 		settings_btn.connect("pressed", Callable(self, "_on_settings_button_pressed"))
 	
+	if btn:
+		btn.grab_focus()
+	
 
 func _on_start_button_pressed() -> void:
 	print("Start pressed - changing to Stage1")

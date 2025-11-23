@@ -156,8 +156,6 @@ func _physics_process(delta: float) -> void:
 	if is_crashed:
 		return
 
-	if (Input.is_key_pressed(KEY_X) or Input.is_joy_button_pressed(0, JOY_BUTTON_X)) and !crashed_falling:
-		start_crash()
 
 	wobble_time += delta
 
@@ -166,8 +164,20 @@ func _physics_process(delta: float) -> void:
 		start_crash()
 		return
 
-	var grounded: bool = is_on_floor() or _is_ground_close(0.4)
-	var wants_spin: bool = Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_Q)
+	var grounded: bool = is_on_floor() or _is_ground_close(1.0)
+	var joy_y_debug = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
+	var joy_trigger_debug = Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT)
+	
+	# Refined input check - Trigger only for lift
+	var wants_spin: bool = (
+		Input.is_key_pressed(KEY_Q) or 
+		Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT) > 0.05 or
+		Input.get_joy_axis(1, JOY_AXIS_TRIGGER_RIGHT) > 0.05
+	)
+
+	# Force print every frame to ensure visibility if something is wrong
+	# print("DEBUG: Spin:", wants_spin, " TrigR:", joy_trigger_debug, " JoyY:", joy_y_debug)
+
 	var rotor_target: float = 0.0
 	if start_sequence_in_progress:
 		rotor_target = 1.0
@@ -186,12 +196,16 @@ func _physics_process(delta: float) -> void:
 			if rb and rb.material_override:
 				rb.material_override.set_shader_parameter("blur_strength", blur)
 			rb.visible = blur > 0.01
-	if sfx_start and wants_spin and !engines_on and !start_sequence_in_progress and !sfx_start.playing:
+	
+	# Start sequence logic
+	if wants_spin and !engines_on and !start_sequence_in_progress:
+		# print("STARTING ENGINES!")
 		start_ready = false
 		start_sequence_in_progress = true
-		sfx_start.stop()
-		sfx_start.volume_db = 100.0
-		sfx_start.play()
+		if sfx_start:
+			sfx_start.stop()
+			sfx_start.volume_db = 100.0
+			sfx_start.play()
 		var t = get_tree().create_timer(2.0)
 		t.timeout.connect(_on_start_ready)
 	var airborne := (!grounded) and (rotor_speed >= min_takeoff_rotor_speed)
@@ -319,9 +333,23 @@ func _physics_process(delta: float) -> void:
 		input_velocity.y = min(input_velocity.y, 0.0)
 
 	var accel_factor = acceleration if input_velocity.length() > 0.0 else deceleration
+	
+	# Apply gravity if not grounded (and not in special crash sequence)
+	if !grounded:
+		velocity.y -= gravity * delta
+	
+	# Restrict horizontal movement if airborne and rotors are not spinning fast enough
+	if !grounded and rotor_speed < min_takeoff_rotor_speed:
+		input_velocity.x = 0
+		input_velocity.z = 0
+		
 	velocity.x = lerp(velocity.x, input_velocity.x, accel_factor * delta)
 	velocity.z = lerp(velocity.z, input_velocity.z, accel_factor * delta)
-	velocity.y = lerp(velocity.y, input_velocity.y, lift_acceleration * delta)
+	
+	# Lift logic
+	if rotor_speed >= min_takeoff_rotor_speed:
+		velocity.y = lerp(velocity.y, input_velocity.y, lift_acceleration * delta)
+	
 	if grounded and !wants_spin:
 		velocity.y = move_toward(velocity.y, 0.0, lift_acceleration * 2.0 * delta)
 	move_and_slide()

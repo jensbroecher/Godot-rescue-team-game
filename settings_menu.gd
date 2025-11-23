@@ -20,6 +20,8 @@ func _ready() -> void:
 	vsync_check.button_pressed = Settings.vsync
 	apply_button.pressed.connect(_on_apply_pressed)
 	back_button.pressed.connect(_on_back_pressed)
+	
+	resolution_option.grab_focus()
 
 func _on_apply_pressed() -> void:
 	var sel_index := resolution_option.get_selected()

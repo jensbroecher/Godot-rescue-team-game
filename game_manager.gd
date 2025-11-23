@@ -70,6 +70,7 @@ func _on_fuel_changed(fuel: float, max_fuel: float) -> void:
 
 func _on_helicopter_crashed() -> void:
 	game_over_panel.visible = true
+	restart_button.grab_focus()
 	# Do not pause the whole tree so UI buttons remain interactive
 	# Helicopter itself is stopped by its own `is_crashed` flag
 
