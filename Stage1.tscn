@@ -1,0 +1,298 @@
+[gd_scene load_steps=27 format=3 uid="uid://5yty5oaqboa1"]
+
+[ext_resource type="PackedScene" uid="uid://co6nftir12w4w" path="res://helicopter.tscn" id="1_51a3m"]
+[ext_resource type="Script" uid="uid://c3j0fncxen7io" path="res://camera_controller.gd" id="2_camera"]
+[ext_resource type="Script" uid="uid://d2qki7xrx8xrh" path="res://game_manager.gd" id="3_game"]
+[ext_resource type="Shader" uid="uid://c3d638behmwd8" path="res://shaders/water.gdshader" id="4_qasgr"]
+[ext_resource type="ArrayMesh" uid="uid://4kf4bx8lxcru" path="res://1.obj" id="6_d1sxv"]
+[ext_resource type="PackedScene" uid="uid://b2u25r5blejfy" path="res://Superyacht.glb" id="7_8ghbs"]
+[ext_resource type="Sky" uid="uid://djx338cmyvob8" path="res://addons/flowing-sky/templates/sky.tres" id="9_allsky"]
+[ext_resource type="Texture2D" uid="uid://b0xhvxc6akl" path="res://people_sprites/dude.png" id="10_dude"]
+[ext_resource type="Script" uid="uid://dd1rfov4x2lyq" path="res://dude.gd" id="11_dude_script"]
+[ext_resource type="Texture2D" uid="uid://dsvpxeskpm5mv" path="res://people_sprites/dude_walking_sideways.png" id="11_dude_walk"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_ship"]
+size = Vector3(20, 5, 40)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ship"]
+size = Vector3(51.155647, 5, 40)
+
+[sub_resource type="StyleBoxFlat" id="SB_FuelBg"]
+bg_color = Color(0.08, 0.08, 0.08, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="SB_FuelFill"]
+bg_color = Color(0.2, 0.8, 0.2, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1, 0.4, 0.1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="Environment" id="Environment_ftegy"]
+background_mode = 2
+sky = ExtResource("9_allsky")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="Compositor" id="Compositor_nuogy"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_3kocv"]
+size = Vector3(320, 0.2, 320)
+subdivide_width = 300
+subdivide_depth = 300
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_d1sxv"]
+noise_type = 0
+frequency = 0.007
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_bcpi7"]
+generate_mipmaps = false
+noise = SubResource("FastNoiseLite_d1sxv")
+seamless = true
+as_normal_map = true
+seamless_blend_skirt = 0.5
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_8ghbs"]
+noise_type = 0
+frequency = 0.02
+fractal_type = 0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_r4a3k"]
+generate_mipmaps = false
+noise = SubResource("FastNoiseLite_8ghbs")
+seamless = true
+as_normal_map = true
+seamless_blend_skirt = 0.5
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_urgrh"]
+frequency = 0.0005
+fractal_type = 2
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_qdptp"]
+generate_mipmaps = false
+noise = SubResource("FastNoiseLite_urgrh")
+seamless = true
+seamless_blend_skirt = 0.5
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_1l0jo"]
+noise_type = 3
+frequency = 0.0225
+fractal_type = 0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_w84gw"]
+generate_mipmaps = false
+noise = SubResource("FastNoiseLite_1l0jo")
+seamless = true
+seamless_blend_skirt = 0.5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_8tj8h"]
+render_priority = -128
+shader = ExtResource("4_qasgr")
+shader_parameter/color_shallow = Color(0.05, 0.35, 0.8, 1)
+shader_parameter/color_deep = Color(0.05, 0.25, 0.6, 1)
+shader_parameter/transparency = 0.95
+shader_parameter/transparency_tint = 0.7
+shader_parameter/screen_mix_strength = 0.0
+shader_parameter/surface_alpha = 0.5
+shader_parameter/metallic = 0.0
+shader_parameter/roughness = 1.0
+shader_parameter/max_visible_depth = 25.0
+shader_parameter/wave_a = SubResource("NoiseTexture2D_qdptp")
+shader_parameter/wave_b = SubResource("NoiseTexture2D_w84gw")
+shader_parameter/wave_move_direction_a = Vector2(-1, 0)
+shader_parameter/wave_move_direction_b = Vector2(0, 1)
+shader_parameter/wave_noise_scale_a = 14.0
+shader_parameter/wave_noise_scale_b = 14.0
+shader_parameter/wave_time_scale_a = 0.05
+shader_parameter/wave_time_scale_b = 0.05
+shader_parameter/wave_height_scale = 0.4
+shader_parameter/wave_normal_flatness = 50.0
+shader_parameter/surface_normals_a = SubResource("NoiseTexture2D_bcpi7")
+shader_parameter/surface_normals_b = SubResource("NoiseTexture2D_r4a3k")
+shader_parameter/surface_normals_move_direction_a = Vector2(-1, 0.2)
+shader_parameter/surface_normals_move_direction_b = Vector2(0.2, 1)
+shader_parameter/surface_texture_roughness = 0.15
+shader_parameter/surface_texture_scale = 0.15
+shader_parameter/surface_texture_time_scale = 0.02
+shader_parameter/ssr_resolution = 2.0
+shader_parameter/ssr_max_travel = 0.0
+shader_parameter/ssr_max_diff = 4.0
+shader_parameter/ssr_mix_strength = 0.0
+shader_parameter/ssr_screen_border_fadeout = 0.0
+shader_parameter/refraction_intensity = 0.0
+shader_parameter/sky_top_color = Color(0.55, 0.75, 0.9, 1)
+shader_parameter/sky_horizon_color = Color(0.45, 0.65, 0.85, 1)
+shader_parameter/sky_curve = 0.3
+shader_parameter/sky_reflect_strength = 0.25
+shader_parameter/border_color = Color(0.005, 0.03, 0.08, 1)
+shader_parameter/border_scale = 0.0
+shader_parameter/border_near = 0.5
+shader_parameter/border_far = 300.0
+shader_parameter/cut_out_x = 0.0
+shader_parameter/cut_out_z = 0.0
+
+[node name="Stage1" type="Node3D"]
+script = ExtResource("3_game")
+
+[node name="Ship" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7703247, -30)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ship"]
+transform = Transform3D(2.5577824, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("BoxMesh_ship")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ship"]
+shape = SubResource("BoxShape3D_ship")
+
+[node name="LandingArea" type="Area3D" parent="Ship"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ship/LandingArea"]
+shape = SubResource("BoxShape3D_ship")
+
+[node name="Island" type="StaticBody3D" parent="."]
+transform = Transform3D(7.9292555, 0, 0, 0, 1, 0, 0, 0, 3.3799148, 0, 0.7703247, 173.29012)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Island"]
+transform = Transform3D(2.5577824, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("BoxMesh_ship")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Island"]
+shape = SubResource("BoxShape3D_ship")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="FuelBar" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 12.0
+offset_bottom = 10.0
+
+[node name="FuelLabel" type="Label" parent="UI/FuelBar"]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "FUEL"
+
+[node name="ProgressBar" type="ProgressBar" parent="UI/FuelBar"]
+layout_mode = 0
+offset_top = 28.0
+offset_right = 200.0
+offset_bottom = 54.0
+theme_override_styles/background = SubResource("SB_FuelBg")
+theme_override_styles/fill = SubResource("SB_FuelFill")
+value = 100.0
+
+[node name="GameOverPanel" type="Control" parent="UI"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ColorRect" type="ColorRect" parent="UI/GameOverPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="CenterContainer" type="CenterContainer" parent="UI/GameOverPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/GameOverPanel/CenterContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="GameOverLabel" type="Label" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 64
+text = "CRASHED!"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="RestartButton" type="Button" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "RESTART"
+
+[node name="MenuButton" type="Button" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "MAIN MENU"
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_ftegy")
+compositor = SubResource("Compositor_nuogy")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.866025, -0.28213, 0.412798, 0, 0.825596, 0.564261, -0.5, 0.488664, -0.714988, -8, 2, -2)
+shadow_enabled = true
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10743.6, 6693.89, -43458.2)
+light_color = Color(0.76, 0.374933, 0.1824, 1)
+light_energy = 11.685
+omni_range = 20000.0
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.81893176, 0, -0.5738909, 0, 1, 0, 0.5738909, 0, 0.81893176, -2.7858763, 3.380354, 5.783035)
+script = ExtResource("2_camera")
+follow_distance = 60.0
+follow_height = 30.0
+isometric_angle = 60.0
+
+[node name="helicopter" parent="." instance=ExtResource("1_51a3m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.141605, -26.073)
+move_speed = 20.0
+max_altitude = 150.0
+simple_collider_center_offset = Vector3(0, 0, 0)
+landing_clearance = 0.8
+grounded_clearance = 0.06
+grounded_clearance_scale = 0.0
+
+[node name="col_1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.8614873, 0, 0, 0, 1.9954497, 0, 0, 0, 1.4049551, 0, 0, 20.824167)
+mesh = ExtResource("6_d1sxv")
+
+[node name="Ocean" type="MeshInstance3D" parent="."]
+transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0, 0, 0)
+mesh = SubResource("BoxMesh_3kocv")
+surface_material_override/0 = SubResource("ShaderMaterial_8tj8h")
+
+[node name="dcol_Superyacht" parent="." instance=ExtResource("7_8ghbs")]
+transform = Transform3D(300, 0, 0, 0, 300, 0, 0, 0, 300, 100, 0, 0)
+
+[node name="DudeTest" type="Sprite3D" parent="."]
+transform = Transform3D(0.4566631, 0, 0, 0, 0.3340649, 0, 0, 0, 0.40075302, -17.644161, 6.297839, -21.868092)
+pixel_size = 0.02
+billboard = 2
+double_sided = false
+alpha_cut = 2
+texture = ExtResource("10_dude")
+script = ExtResource("11_dude_script")
+walking_texture = ExtResource("11_dude_walk")

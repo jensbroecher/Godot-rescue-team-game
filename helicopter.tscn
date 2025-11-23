@@ -1,0 +1,84 @@
+[gd_scene load_steps=18 format=3 uid="uid://co6nftir12w4w"]
+
+[ext_resource type="Script" uid="uid://csowsn0tk0anm" path="res://helicopter.gd" id="1_0d5e8"]
+[ext_resource type="PackedScene" uid="uid://p41btm8ai6wx" path="res://Rotor.glb" id="3_0lybf"]
+[ext_resource type="PackedScene" uid="uid://dlih7j2gas02v" path="res://Helicopter.glb" id="3_l0d2j"]
+[ext_resource type="AudioStream" uid="uid://dlcu21yv8tk8h" path="res://sounds/helicopter_flying_#2-1763764994210.mp3" id="4_fly"]
+[ext_resource type="AudioStream" uid="uid://do4d4m4ke8pwx" path="res://sounds/helicopter-starting.mp3" id="5_start"]
+[ext_resource type="AudioStream" uid="uid://wbaa8u20nkfu" path="res://Crash1.mp3" id="6_crash1"]
+[ext_resource type="AudioStream" uid="uid://6gr411c7yrqg" path="res://Crash2.mp3" id="7_crash2"]
+[ext_resource type="AudioStream" uid="uid://c57mfgvq6fue2" path="res://Crash3.mp3" id="8_crash3"]
+[ext_resource type="AudioStream" uid="uid://box36gvi7jqkx" path="res://WaterCrash.mp3" id="9_wcr"]
+[ext_resource type="PackedScene" uid="uid://goh3vkv8vodf" path="res://BigExplosionScene.tscn" id="10_expl"]
+
+[sub_resource type="Shader" id="Shader_rotor_blur"]
+code = "shader_type spatial;
+render_mode blend_mix, cull_disabled, unshaded, depth_test_disabled;
+uniform float blur_strength : hint_range(0.0,1.0) = 0.0;
+uniform vec4 blur_color : source_color = vec4(0.8, 0.8, 0.8, 0.9);
+void fragment() {
+    vec2 p = (UV - vec2(0.5)) * 2.0;
+    float r = length(p);
+    float alpha = smoothstep(1.0, 0.0, r);
+    float a = blur_strength * alpha * blur_color.a;
+    ALBEDO = blur_color.rgb;
+    ALPHA = a;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rotor_blur"]
+render_priority = 0
+shader = SubResource("Shader_rotor_blur")
+shader_parameter/blur_strength = 0.0
+shader_parameter/blur_color = Color(0.8, 0.8, 0.8, 0.9)
+
+[sub_resource type="QuadMesh" id="QuadMesh_rotor"]
+size = Vector2(12, 12)
+
+ 
+
+[node name="Helicopter" type="CharacterBody3D"]
+script = ExtResource("1_0d5e8")
+explosion_scene = ExtResource("10_expl")
+
+[node name="Heli Body" parent="." instance=ExtResource("3_l0d2j")]
+transform = Transform3D(-133.98245, 0, -1.0271453e-05, 0, 133.69789, 0, 1.1713118e-05, 0, -117.49173, 2.1138217, -0.045719147, -0.14979362)
+
+[node name="Rotor" parent="." instance=ExtResource("3_0lybf")]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -6.645085, 1.372169, -4.037841)
+
+[node name="RotorBlur" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_rotor_blur")
+mesh = SubResource("QuadMesh_rotor")
+scale = Vector3(0.01, 0.01, 0.01)
+
+[node name="Rotor2" parent="." instance=ExtResource("3_0lybf")]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, 6.3064103, 1.3590984, -3.990109)
+
+[node name="RotorBlur" type="MeshInstance3D" parent="Rotor2"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_rotor_blur")
+mesh = SubResource("QuadMesh_rotor")
+scale = Vector3(0.01, 0.01, 0.01)
+
+[node name="SFX_Flying" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("4_fly")
+
+[node name="SFX_Start" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("5_start")
+
+[node name="SFX_Crash1" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("6_crash1")
+volume_db = 100.0
+
+[node name="SFX_Crash2" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("7_crash2")
+volume_db = 100.0
+
+[node name="SFX_Crash3" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("8_crash3")
+volume_db = 100.0
+
+[node name="SFX_WaterCrash" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("9_wcr")
+volume_db = 100.0
