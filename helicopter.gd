@@ -39,6 +39,10 @@ extends CharacterBody3D
 @export var explosion_scene: PackedScene
 @export var enable_downwash: bool = false
 @export var enable_rotor_disc_blur: bool = false
+@export var mission_radius: float = 250.0
+@export var mission_warning_radius: float = 200.0
+@export var auto_return_speed_multiplier: float = 1.2
+@export var auto_return_turn_rate_scale: float = 1.6
 
 var current_fuel: float = 0.0
 var is_crashed: bool = false
@@ -75,9 +79,13 @@ var simple_box_size: Vector3 = Vector3.ZERO
 var simple_box_center: Vector3 = Vector3.ZERO
 var was_grounded: bool = false
 var aligned_this_grounding: bool = false
+var mission_start: Vector3 = Vector3.ZERO
+var mission_warning_active: bool = false
+var auto_returning: bool = false
 
 signal fuel_changed(fuel: float, max_fuel: float)
 signal helicopter_crashed
+signal mission_area_warning(active: bool)
 
 func _ready() -> void:
 	current_fuel = max_fuel
@@ -133,6 +141,9 @@ func _ready() -> void:
 	explosion_fx = get_node_or_null("ExplosionParticles")
 	splash_fx = get_node_or_null("WaterSplash")
 	fountain_fx = get_node_or_null("WaterFountain")
+	mission_start = global_position
+	if mission_radius > 0.0 and (mission_warning_radius <= 0.0 or mission_warning_radius > mission_radius):
+		mission_warning_radius = mission_radius * 0.8
 
 func _physics_process(delta: float) -> void:
 	# If we are in the falling crash sequence, apply gravity and count down
@@ -261,6 +272,7 @@ func _physics_process(delta: float) -> void:
 	var horizontal_forward = Vector3(forward.x, 0.0, forward.z).normalized()
 	var right = transform.basis.x.normalized()
 	var horizontal_right = Vector3(right.x, 0.0, right.z).normalized()
+	var return_vector := _update_mission_area_state()
 	var input_velocity: Vector3 = Vector3.ZERO
 
 	# Keyboard Input
@@ -329,6 +341,13 @@ func _physics_process(delta: float) -> void:
 	input_velocity.x *= speed_mult
 	input_velocity.z *= speed_mult
 
+	if auto_returning and mission_radius > 0.0:
+		var return_dir := return_vector.normalized()
+		if return_dir != Vector3.ZERO:
+			input_velocity.x = return_dir.x * move_speed * auto_return_speed_multiplier
+			input_velocity.z = return_dir.z * move_speed * auto_return_speed_multiplier
+			sustained_accum = 0.0
+
 	if global_position.y >= max_altitude:
 		input_velocity.y = min(input_velocity.y, 0.0)
 
@@ -366,7 +385,12 @@ func _physics_process(delta: float) -> void:
 				start_crash()
 				break
 
-	if !Input.is_key_pressed(KEY_SHIFT):
+	if auto_returning and mission_radius > 0.0:
+		var return_dir := return_vector.normalized()
+		if return_dir != Vector3.ZERO:
+			var target_yaw := atan2(-return_dir.x, -return_dir.z)
+			rotation.y = lerp_angle(rotation.y, target_yaw, turn_speed * auto_return_turn_rate_scale * delta)
+	elif !Input.is_key_pressed(KEY_SHIFT):
 		var rot: float = 0.0
 		if Input.is_key_pressed(KEY_A):
 			rot += turn_speed * delta
@@ -638,6 +662,30 @@ func _align_to_ground_soft(max_cast: float, alpha: float) -> void:
 
 func align_to_ground(max_cast: float) -> void:
 	_align_to_ground(max_cast)
+
+func set_mission_start(pos: Vector3) -> void:
+	mission_start = pos
+
+func _update_mission_area_state() -> Vector3:
+	if mission_radius <= 0.0:
+		if mission_warning_active:
+			mission_warning_active = false
+			emit_signal("mission_area_warning", false)
+		auto_returning = false
+		return Vector3.ZERO
+	var to_start := mission_start - global_position
+	to_start.y = 0.0
+	var distance := to_start.length()
+	var warning_threshold := mission_warning_radius if mission_warning_radius > 0.0 else mission_radius * 0.5
+	var warn_now := distance >= warning_threshold
+	if warn_now != mission_warning_active:
+		mission_warning_active = warn_now
+		emit_signal("mission_area_warning", mission_warning_active)
+	if distance >= mission_radius:
+		auto_returning = true
+	elif auto_returning and distance <= warning_threshold * 0.7:
+		auto_returning = false
+	return to_start
 
 func _on_stop_start_sound() -> void:
 	if sfx_start and sfx_start.playing:

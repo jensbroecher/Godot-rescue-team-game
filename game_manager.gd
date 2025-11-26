@@ -7,6 +7,7 @@ var fuel_bar: ProgressBar
 var restart_button: Button
 var menu_button: Button
 var ocean: MeshInstance3D
+var mission_warning_panel: Control
 
 func _ready() -> void:
 	helicopter = get_node_or_null("helicopter")
@@ -18,10 +19,12 @@ func _ready() -> void:
 	fuel_bar = $UI/FuelBar/ProgressBar
 	restart_button = $UI/GameOverPanel/CenterContainer/VBoxContainer/RestartButton
 	menu_button = $UI/GameOverPanel/CenterContainer/VBoxContainer/MenuButton
+	mission_warning_panel = $UI/MissionWarning
 	
 	if helicopter != null:
 		helicopter.fuel_changed.connect(_on_fuel_changed)
 		helicopter.helicopter_crashed.connect(_on_helicopter_crashed)
+		helicopter.mission_area_warning.connect(_on_mission_warning)
 	
 	restart_button.pressed.connect(_on_restart_pressed)
 	menu_button.pressed.connect(_on_menu_pressed)
@@ -36,6 +39,8 @@ func _ready() -> void:
 			helicopter.velocity = Vector3(0, -2.0, 0)
 			if helicopter.has_method("align_to_ground"):
 				helicopter.align_to_ground(20.0)
+			if helicopter.has_method("set_mission_start"):
+				helicopter.set_mission_start(helicopter.global_position)
 
 	_setup_collision_for_named_nodes()
 
@@ -86,6 +91,10 @@ func _on_ship_body_entered(body: Node3D) -> void:
 	if body == helicopter:
 		if helicopter.is_on_floor() or _helicopter_is_grounded_proximity(0.5):
 			helicopter.refuel()
+
+func _on_mission_warning(active: bool) -> void:
+	if mission_warning_panel:
+		mission_warning_panel.visible = active
 
 
 

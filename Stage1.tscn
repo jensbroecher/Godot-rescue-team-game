@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3 uid="uid://5yty5oaqboa1"]
+[gd_scene load_steps=37 format=3 uid="uid://5yty5oaqboa1"]
 
 [ext_resource type="PackedScene" uid="uid://co6nftir12w4w" path="res://helicopter.tscn" id="1_51a3m"]
 [ext_resource type="Script" uid="uid://c3j0fncxen7io" path="res://camera_controller.gd" id="2_camera"]
@@ -7,11 +7,15 @@
 [ext_resource type="ArrayMesh" uid="uid://4kf4bx8lxcru" path="res://1.obj" id="6_d1sxv"]
 [ext_resource type="PackedScene" uid="uid://b2u25r5blejfy" path="res://Superyacht.glb" id="7_8ghbs"]
 [ext_resource type="Sky" uid="uid://djx338cmyvob8" path="res://addons/flowing-sky/templates/sky.tres" id="9_allsky"]
-[ext_resource type="Shader" path="res://shaders/clouds_spatial.gdshader" id="9_clouds_spatial"]
+[ext_resource type="Shader" uid="uid://b5rs8bxbckxha" path="res://shaders/clouds_spatial.gdshader" id="9_clouds_spatial"]
 [ext_resource type="Texture2D" uid="uid://b0xhvxc6akl" path="res://people_sprites/dude.png" id="10_dude"]
 [ext_resource type="Script" uid="uid://dd1rfov4x2lyq" path="res://dude.gd" id="11_dude_script"]
 [ext_resource type="Texture2D" uid="uid://dsvpxeskpm5mv" path="res://people_sprites/dude_walking_sideways.png" id="11_dude_walk"]
 [ext_resource type="PackedScene" uid="uid://dmhk0w106vmmt" path="res://Highrise.glb" id="11_jfr8b"]
+[ext_resource type="ArrayMesh" uid="uid://ddv4ddvly8wlu" path="res://10m_-108.03_44.63_tile_1_1.obj" id="13_4b8vk"]
+[ext_resource type="PackedScene" uid="uid://cl8rf6v736w21" path="res://Building2.glb" id="14_5f46o"]
+[ext_resource type="PackedScene" uid="uid://d1om2oh6kkw1u" path="res://BridgeSegment.glb" id="15_q0kgd"]
+[ext_resource type="PackedScene" uid="uid://nppll4e60bqt" path="res://Tree.glb" id="16_3mg7b"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_ship"]
 size = Vector3(20, 5, 40)
@@ -38,6 +42,13 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
+[sub_resource type="StyleBoxFlat" id="SB_Warning"]
+bg_color = Color(0.55, 0.08, 0.08, 0.88)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="Environment" id="Environment_ftegy"]
 background_mode = 2
 sky = ExtResource("9_allsky")
@@ -45,6 +56,29 @@ tonemap_mode = 2
 glow_enabled = true
 
 [sub_resource type="Compositor" id="Compositor_nuogy"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_clouds"]
+size = Vector2(1000, 1000)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_clouds_spatial"]
+noise_type = 3
+frequency = 0.005
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_clouds_spatial"]
+noise = SubResource("FastNoiseLite_clouds_spatial")
+seamless = true
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_clouds_spatial"]
+render_priority = 0
+shader = ExtResource("9_clouds_spatial")
+shader_parameter/cloud_color = Color(0.9, 0.9, 0.9, 0.4)
+shader_parameter/cloud_density = 0.4
+shader_parameter/noise_texture = SubResource("NoiseTexture2D_clouds_spatial")
+shader_parameter/noise_tiling = Vector2(5, 5)
+shader_parameter/wind_speed = Vector2(0.02, 0.01)
+shader_parameter/cloud_height_offset = 0.0
+shader_parameter/softness = 0.2
+shader_parameter/fade_distance = 0.1
 
 [sub_resource type="BoxMesh" id="BoxMesh_3kocv"]
 size = Vector3(320, 0.2, 320)
@@ -140,28 +174,7 @@ shader_parameter/border_near = 0.5
 shader_parameter/border_far = 300.0
 shader_parameter/cut_out_x = 0.0
 shader_parameter/cut_out_z = 0.0
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_clouds"]
-size = Vector2(1000, 1000)
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_clouds_spatial"]
-noise_type = 3
-frequency = 0.005
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_clouds_spatial"]
-seamless = true
-noise = SubResource("FastNoiseLite_clouds_spatial")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_clouds_spatial"]
-render_priority = 0
-shader = ExtResource("9_clouds_spatial")
-shader_parameter/cloud_color = Color(0.9, 0.9, 0.9, 0.4)
-shader_parameter/cloud_density = 0.4
-shader_parameter/noise_tiling = Vector2(5, 5)
-shader_parameter/wind_speed = Vector2(0.02, 0.01)
-shader_parameter/cloud_height_offset = 0.0
-shader_parameter/softness = 0.2
-shader_parameter/noise_texture = SubResource("NoiseTexture2D_clouds_spatial")
+shader_parameter/fade_distance = 0.1
 
 [node name="Stage1" type="Node3D"]
 script = ExtResource("3_game")
@@ -183,7 +196,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 shape = SubResource("BoxShape3D_ship")
 
 [node name="Island" type="StaticBody3D" parent="."]
-transform = Transform3D(7.9292555, 0, 0, 0, 1, 0, 0, 0, 3.3799148, 0, 0.7703247, 173.29012)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 78.612)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Island"]
 transform = Transform3D(2.5577824, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
@@ -216,6 +229,29 @@ offset_bottom = 54.0
 theme_override_styles/background = SubResource("SB_FuelBg")
 theme_override_styles/fill = SubResource("SB_FuelFill")
 value = 100.0
+
+[node name="MissionWarning" type="Panel" parent="UI"]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.2
+anchor_top = 0.05
+anchor_right = 0.8
+anchor_bottom = 0.13
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("SB_Warning")
+
+[node name="WarningLabel" type="Label" parent="UI/MissionWarning"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "LEAVING MISSION AREA - RETURNING TO SHIP"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="GameOverPanel" type="Control" parent="UI"]
 visible = false
@@ -273,9 +309,8 @@ text = "MAIN MENU"
 environment = SubResource("Environment_ftegy")
 compositor = SubResource("Compositor_nuogy")
 
-
 [node name="CloudPlane" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 100, 0)
+transform = Transform3D(3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 253.05975, 0)
 mesh = SubResource("PlaneMesh_clouds")
 surface_material_override/0 = SubResource("ShaderMaterial_clouds_spatial")
 
@@ -306,11 +341,11 @@ grounded_clearance = 0.06
 grounded_clearance_scale = 0.0
 
 [node name="col_House" type="MeshInstance3D" parent="."]
-transform = Transform3D(1.8614873, 0, 0, 0, 1.9954497, 0, 0, 0, 1.4049551, 0, 2.569643, 148.31969)
+transform = Transform3D(1.8614873, 0, 0, 0, 1.9954497, 0, 0, 0, 1.4049551, -12.834618, 1.5060024, 79.30171)
 mesh = ExtResource("6_d1sxv")
 
 [node name="Ocean" type="MeshInstance3D" parent="."]
-transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, -0.3380127, -3.8146973e-06, 0.14865112)
+transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, -0.23857117, 0.33442307, -0.1400299)
 mesh = SubResource("BoxMesh_3kocv")
 surface_material_override/0 = SubResource("ShaderMaterial_8tj8h")
 
@@ -328,4 +363,17 @@ script = ExtResource("11_dude_script")
 walking_texture = ExtResource("11_dude_walk")
 
 [node name="col_Highrise" parent="." instance=ExtResource("11_jfr8b")]
-transform = Transform3D(450, 0, 0, 0, 450, 0, 0, 0, 450, 38.817497, 1.6907578, 114.26181)
+transform = Transform3D(450, 0, 0, 0, 450, 0, 0, 0, 450, 25.18142, 1.6907578, 55.558784)
+
+[node name="col_Land" type="MeshInstance3D" parent="."]
+transform = Transform3D(3, 0, 0, 0, -0.013159744, 4.9998918, 0, -1.9999567, -0.03289936, -273.1125, 0, -149.45969)
+mesh = ExtResource("13_4b8vk")
+
+[node name="col_Building2" parent="." instance=ExtResource("14_5f46o")]
+transform = Transform3D(350, 0, 0, 0, 350, 0, 0, 0, 350, 15.517, 10.85874, -187.21338)
+
+[node name="col_BridgeSegment" parent="." instance=ExtResource("15_q0kgd")]
+transform = Transform3D(-1.2261858, 0, -59.987465, 0, 59.999996, 0, 59.987465, 0, -1.2261858, -10.32151, -1.3741431, -4.132701)
+
+[node name="col_Tree" parent="." instance=ExtResource("16_3mg7b")]
+transform = Transform3D(80, 0, 0, 0, 80, 0, 0, 0, 80, 7.325511, 2.4816122, -12.810239)
