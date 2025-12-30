@@ -1,6 +1,7 @@
 extends Control
 
 @onready var resolution_option: OptionButton = $CenterContainer/VBoxContainer/ResolutionRow/OptionButton
+@onready var fullscreen_row: Control = $CenterContainer/VBoxContainer/FullscreenRow
 @onready var fullscreen_check: CheckBox = $CenterContainer/VBoxContainer/FullscreenRow/CheckBox
 @onready var vsync_check: CheckBox = $CenterContainer/VBoxContainer/VsyncRow/CheckBox
 @onready var apply_button: Button = $CenterContainer/VBoxContainer/Buttons/ApplyButton
@@ -10,13 +11,24 @@ func _ready() -> void:
 	resolution_option.clear()
 	for res: Vector2i in Settings.resolution_options:
 		resolution_option.add_item(str(res.x) + " x " + str(res.y))
+	
+	# Add Fullscreen option at the end
+	resolution_option.add_item("Fullscreen")
+	
 	var idx := 0
-	for i in range(resolution_option.item_count):
-		var res: Vector2i = Settings.resolution_options[i]
-		if res.x == Settings.width and res.y == Settings.height:
-			idx = i
+	if Settings.fullscreen:
+		idx = resolution_option.item_count - 1
+	else:
+		for i in range(Settings.resolution_options.size()):
+			var res: Vector2i = Settings.resolution_options[i]
+			if res.x == Settings.width and res.y == Settings.height:
+				idx = i
+	
 	resolution_option.select(idx)
-	fullscreen_check.button_pressed = Settings.fullscreen
+	
+	# Hide the separate fullscreen checkbox since it's now in the dropdown
+	fullscreen_row.visible = false
+	
 	vsync_check.button_pressed = Settings.vsync
 	apply_button.pressed.connect(_on_apply_pressed)
 	back_button.pressed.connect(_on_back_pressed)
@@ -25,11 +37,16 @@ func _ready() -> void:
 
 func _on_apply_pressed() -> void:
 	var sel_index := resolution_option.get_selected()
-	if sel_index >= 0 and sel_index < Settings.resolution_options.size():
-		var res: Vector2i = Settings.resolution_options[sel_index]
-		Settings.width = res.x
-		Settings.height = res.y
-	Settings.fullscreen = fullscreen_check.button_pressed
+	# Check if the last item (Fullscreen) is selected
+	if sel_index == resolution_option.item_count - 1:
+		Settings.fullscreen = true
+	else:
+		Settings.fullscreen = false
+		if sel_index >= 0 and sel_index < Settings.resolution_options.size():
+			var res: Vector2i = Settings.resolution_options[sel_index]
+			Settings.width = res.x
+			Settings.height = res.y
+	
 	Settings.vsync = vsync_check.button_pressed
 	Settings.save_settings()
 	Settings.apply_settings()

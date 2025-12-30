@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cp12gdahfd3s5"
+path="res://.godot/imported/Male_Suit.obj-a9d5b712f4aab8ddbe2fe04903dab688.mesh"
+
+[deps]
+
+files=["res://.godot/imported/Male_Suit.obj-a9d5b712f4aab8ddbe2fe04903dab688.mesh"]
+
+source_file="res://Animated Men Characters - Feb 2019/OBJ/Male_Suit.obj"
+dest_files=["res://.godot/imported/Male_Suit.obj-a9d5b712f4aab8ddbe2fe04903dab688.mesh", "res://.godot/imported/Male_Suit.obj-a9d5b712f4aab8ddbe2fe04903dab688.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

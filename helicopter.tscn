@@ -1,7 +1,7 @@
-[gd_scene load_steps=18 format=3 uid="uid://co6nftir12w4w"]
+[gd_scene load_steps=15 format=3 uid="uid://co6nftir12w4w"]
 
 [ext_resource type="Script" uid="uid://csowsn0tk0anm" path="res://helicopter.gd" id="1_0d5e8"]
-[ext_resource type="PackedScene" uid="uid://p41btm8ai6wx" path="res://Rotor.glb" id="3_0lybf"]
+[ext_resource type="Texture2D" uid="uid://cqs5fg4dwg8cj" path="res://heli blades.png" id="2_blades"]
 [ext_resource type="PackedScene" uid="uid://dlih7j2gas02v" path="res://Helicopter.glb" id="3_l0d2j"]
 [ext_resource type="AudioStream" uid="uid://dlcu21yv8tk8h" path="res://sounds/helicopter_flying_#2-1763764994210.mp3" id="4_fly"]
 [ext_resource type="AudioStream" uid="uid://do4d4m4ke8pwx" path="res://sounds/helicopter-starting.mp3" id="5_start"]
@@ -10,31 +10,22 @@
 [ext_resource type="AudioStream" uid="uid://c57mfgvq6fue2" path="res://Crash3.mp3" id="8_crash3"]
 [ext_resource type="AudioStream" uid="uid://box36gvi7jqkx" path="res://WaterCrash.mp3" id="9_wcr"]
 [ext_resource type="PackedScene" uid="uid://goh3vkv8vodf" path="res://BigExplosionScene.tscn" id="10_expl"]
+[ext_resource type="Shader" uid="uid://b7a3vdxo8uucb" path="res://rotor_blur.gdshader" id="11_shader"]
+[ext_resource type="Texture2D" uid="uid://dretdtp6bk5ty" path="res://heli tail blades.png" id="12_tail_blades"]
 
-[sub_resource type="Shader" id="Shader_rotor_blur"]
-code = "shader_type spatial;
-render_mode blend_mix, cull_disabled, unshaded, depth_test_disabled;
-uniform float blur_strength : hint_range(0.0,1.0) = 0.0;
-uniform vec4 blur_color : source_color = vec4(0.8, 0.8, 0.8, 0.9);
-void fragment() {
-    vec2 p = (UV - vec2(0.5)) * 2.0;
-    float r = length(p);
-    float alpha = smoothstep(1.0, 0.0, r);
-    float a = blur_strength * alpha * blur_color.a;
-    ALBEDO = blur_color.rgb;
-    ALPHA = a;
-}"
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_rotor_blur"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rotor"]
 render_priority = 0
-shader = SubResource("Shader_rotor_blur")
+shader = ExtResource("11_shader")
+shader_parameter/texture_albedo = ExtResource("2_blades")
 shader_parameter/blur_strength = 0.0
-shader_parameter/blur_color = Color(0.8, 0.8, 0.8, 0.9)
+shader_parameter/samples = 12
 
-[sub_resource type="QuadMesh" id="QuadMesh_rotor"]
-size = Vector2(12, 12)
-
- 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tail"]
+render_priority = 0
+shader = ExtResource("11_shader")
+shader_parameter/texture_albedo = ExtResource("12_tail_blades")
+shader_parameter/blur_strength = 0.0
+shader_parameter/samples = 12
 
 [node name="Helicopter" type="CharacterBody3D"]
 script = ExtResource("1_0d5e8")
@@ -43,23 +34,24 @@ explosion_scene = ExtResource("10_expl")
 [node name="Heli Body" parent="." instance=ExtResource("3_l0d2j")]
 transform = Transform3D(-133.98245, 0, -1.0271453e-05, 0, 133.69789, 0, 1.1713118e-05, 0, -117.49173, 2.1138217, -0.045719147, -0.14979362)
 
-[node name="Rotor" parent="." instance=ExtResource("3_0lybf")]
-transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -6.645085, 1.372169, -4.037841)
+[node name="Rotor" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.6996975, 5.831769, -4.037841)
+material_override = SubResource("ShaderMaterial_rotor")
+axis = 1
+texture = ExtResource("2_blades")
 
-[node name="RotorBlur" type="MeshInstance3D" parent="Rotor"]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
-material_override = SubResource("ShaderMaterial_rotor_blur")
-mesh = SubResource("QuadMesh_rotor")
-scale = Vector3(0.01, 0.01, 0.01)
+[node name="Rotor2" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.250999, 5.829434, -4.0534534)
+material_override = SubResource("ShaderMaterial_rotor")
+axis = 1
+texture = ExtResource("2_blades")
 
-[node name="Rotor2" parent="." instance=ExtResource("3_0lybf")]
-transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, 6.3064103, 1.3590984, -3.990109)
-
-[node name="RotorBlur" type="MeshInstance3D" parent="Rotor2"]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
-material_override = SubResource("ShaderMaterial_rotor_blur")
-mesh = SubResource("QuadMesh_rotor")
-scale = Vector3(0.01, 0.01, 0.01)
+[node name="TailRotor" type="Sprite3D" parent="."]
+transform = Transform3D(0.29999998, 0, 0, 0, 0.2845618, 0.09499773, 0, -0.09499773, 0.2845618, -0.48995084, 2.9647665, 6.9057837)
+material_override = SubResource("ShaderMaterial_tail")
+flip_h = true
+axis = 0
+texture = ExtResource("12_tail_blades")
 
 [node name="SFX_Flying" type="AudioStreamPlayer3D" parent="."]
 stream = ExtResource("4_fly")
@@ -82,3 +74,5 @@ volume_db = 100.0
 [node name="SFX_WaterCrash" type="AudioStreamPlayer3D" parent="."]
 stream = ExtResource("9_wcr")
 volume_db = 100.0
+
+

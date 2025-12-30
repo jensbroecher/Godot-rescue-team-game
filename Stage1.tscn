@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=3 uid="uid://5yty5oaqboa1"]
+[gd_scene load_steps=47 format=3 uid="uid://5yty5oaqboa1"]
 
 [ext_resource type="PackedScene" uid="uid://co6nftir12w4w" path="res://helicopter.tscn" id="1_51a3m"]
 [ext_resource type="Script" uid="uid://c3j0fncxen7io" path="res://camera_controller.gd" id="2_camera"]
@@ -13,15 +13,56 @@
 [ext_resource type="Texture2D" uid="uid://dsvpxeskpm5mv" path="res://people_sprites/dude_walking_sideways.png" id="11_dude_walk"]
 [ext_resource type="PackedScene" uid="uid://dmhk0w106vmmt" path="res://Highrise.glb" id="11_jfr8b"]
 [ext_resource type="ArrayMesh" uid="uid://ddv4ddvly8wlu" path="res://10m_-108.03_44.63_tile_1_1.obj" id="13_4b8vk"]
-[ext_resource type="PackedScene" uid="uid://cl8rf6v736w21" path="res://Building2.glb" id="14_5f46o"]
-[ext_resource type="PackedScene" uid="uid://d1om2oh6kkw1u" path="res://BridgeSegment.glb" id="15_q0kgd"]
+[ext_resource type="ArrayMesh" uid="uid://beff2nggwno6k" path="res://objects/bridge/bridge.obj" id="15_q0kgd"]
 [ext_resource type="PackedScene" uid="uid://nppll4e60bqt" path="res://Tree.glb" id="16_3mg7b"]
+[ext_resource type="ArrayMesh" uid="uid://7kvf4cd64f3s" path="res://objects/forklift/forklift.obj" id="16_ur4gu"]
+[ext_resource type="Texture2D" uid="uid://deyesmakhfko1" path="res://lowpolysprites/grass.png" id="17_ur4gu"]
+[ext_resource type="PackedScene" uid="uid://f2mijkn0q75h" path="res://aircraftcarriernew.glb" id="AircraftCarrier_Glb"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_ship"]
-size = Vector3(20, 5, 40)
+[sub_resource type="BoxShape3D" id="BoxShape3D_carrier"]
+size = Vector3(70, 20, 300)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_ship"]
-size = Vector3(51.155647, 5, 40)
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_5f46o"]
+load_path = "res://.godot/imported/forrestfloor.png-a8b6069709fd6102cc095a8359ba7034.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5f46o"]
+albedo_color = Color(0.2566233, 0.29233646, 0.24260905, 1)
+emission_texture = SubResource("CompressedTexture2D_5f46o")
+normal_scale = -3.52
+normal_texture = SubResource("CompressedTexture2D_5f46o")
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_IslandMain"]
+material = SubResource("StandardMaterial3D_5f46o")
+top_radius = 150.0
+bottom_radius = 180.0
+height = 20.0
+rings = 8
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_IslandMain"]
+height = 20.0
+radius = 150.0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_IslandSub1"]
+material = SubResource("StandardMaterial3D_5f46o")
+top_radius = 120.0
+bottom_radius = 150.0
+height = 20.0
+rings = 8
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_IslandSub1"]
+height = 20.0
+radius = 120.0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_IslandSub2"]
+material = SubResource("StandardMaterial3D_5f46o")
+top_radius = 100.0
+bottom_radius = 130.0
+height = 20.0
+rings = 8
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_IslandSub2"]
+height = 20.0
+radius = 100.0
 
 [sub_resource type="StyleBoxFlat" id="SB_FuelBg"]
 bg_color = Color(0.08, 0.08, 0.08, 0.9)
@@ -182,28 +223,43 @@ script = ExtResource("3_game")
 [node name="Ship" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7703247, -30)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ship"]
-transform = Transform3D(2.5577824, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("BoxMesh_ship")
+[node name="ShipVisuals" parent="Ship" instance=ExtResource("AircraftCarrier_Glb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ship"]
-shape = SubResource("BoxShape3D_ship")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
+shape = SubResource("BoxShape3D_carrier")
 
 [node name="LandingArea" type="Area3D" parent="Ship"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 19, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ship/LandingArea"]
-shape = SubResource("BoxShape3D_ship")
+shape = SubResource("BoxShape3D_carrier")
 
 [node name="Island" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 78.612)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 564.2489)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Island"]
-transform = Transform3D(2.5577824, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("BoxMesh_ship")
+[node name="MeshMain" type="MeshInstance3D" parent="Island"]
+mesh = SubResource("CylinderMesh_IslandMain")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Island"]
-shape = SubResource("BoxShape3D_ship")
+[node name="ColMain" type="CollisionShape3D" parent="Island"]
+shape = SubResource("CylinderShape3D_IslandMain")
+
+[node name="MeshSub1" type="MeshInstance3D" parent="Island"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 0, 50)
+mesh = SubResource("CylinderMesh_IslandSub1")
+
+[node name="ColSub1" type="CollisionShape3D" parent="Island"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 0, 50)
+shape = SubResource("CylinderShape3D_IslandSub1")
+
+[node name="MeshSub2" type="MeshInstance3D" parent="Island"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 0, -80)
+mesh = SubResource("CylinderMesh_IslandSub2")
+
+[node name="ColSub2" type="CollisionShape3D" parent="Island"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 0, -80)
+shape = SubResource("CylinderShape3D_IslandSub2")
 
 [node name="UI" type="CanvasLayer" parent="."]
 
@@ -218,8 +274,8 @@ offset_bottom = 10.0
 [node name="FuelLabel" type="Label" parent="UI/FuelBar"]
 layout_mode = 0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "FUEL"
+theme_override_font_sizes/font_size = 16
+text = "CHECK 2"
 
 [node name="ProgressBar" type="ProgressBar" parent="UI/FuelBar"]
 layout_mode = 0
@@ -232,8 +288,7 @@ value = 100.0
 
 [node name="MissionWarning" type="Panel" parent="UI"]
 visible = false
-layout_mode = 1
-anchors_preset = 0
+anchors_preset = -1
 anchor_left = 0.2
 anchor_top = 0.05
 anchor_right = 0.8
@@ -248,8 +303,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_font_sizes/font_size = 32
-text = "LEAVING MISSION AREA - RETURNING TO SHIP"
+theme_override_font_sizes/font_size = 24
+text = "LEAVING MISSION AREA - RETURNING"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -285,7 +340,7 @@ alignment = 1
 
 [node name="GameOverLabel" type="Label" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 64
+theme_override_font_sizes/font_size = 48
 text = "CRASHED!"
 horizontal_alignment = 1
 
@@ -296,13 +351,13 @@ layout_mode = 2
 [node name="RestartButton" type="Button" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(200, 60)
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "RESTART"
 
 [node name="MenuButton" type="Button" parent="UI/GameOverPanel/CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(200, 60)
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "MAIN MENU"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -317,6 +372,8 @@ surface_material_override/0 = SubResource("ShaderMaterial_clouds_spatial")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-0.866025, -0.28213, 0.412798, 0, 0.825596, 0.564261, -0.5, 0.488664, -0.714988, -8, 2, -2)
 shadow_enabled = true
+directional_shadow_fade_start = 1300.0
+directional_shadow_max_distance = 1500.0
 
 [node name="OmniLight3D" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10743.6, 6693.89, -43458.2)
@@ -341,7 +398,7 @@ grounded_clearance = 0.06
 grounded_clearance_scale = 0.0
 
 [node name="col_House" type="MeshInstance3D" parent="."]
-transform = Transform3D(1.8614873, 0, 0, 0, 1.9954497, 0, 0, 0, 1.4049551, -12.834618, 1.5060024, 79.30171)
+transform = Transform3D(1.8614873, 0, 0, 0, 1.9954497, 0, 0, 0, 1.4049551, -12.834618, 9.30076, 526.4563)
 mesh = ExtResource("6_d1sxv")
 
 [node name="Ocean" type="MeshInstance3D" parent="."]
@@ -350,10 +407,10 @@ mesh = SubResource("BoxMesh_3kocv")
 surface_material_override/0 = SubResource("ShaderMaterial_8tj8h")
 
 [node name="dcol_Superyacht" parent="." instance=ExtResource("7_8ghbs")]
-transform = Transform3D(300, 0, 0, 0, 300, 0, 0, 0, 300, 100, 0, 0)
+transform = Transform3D(300, 0, 0, 0, 300, 0, 0, 0, 300, 100, 0, 92.86864)
 
 [node name="DudeTest" type="Sprite3D" parent="."]
-transform = Transform3D(0.4566631, 0, 0, 0, 0.3340649, 0, 0, 0, 0.40075302, -17.644161, 6.297839, -21.868092)
+transform = Transform3D(0.4566631, 0, 0, 0, 0.3340649, 0, 0, 0, 0.40075302, -17.644161, 13.17756, 463.7611)
 pixel_size = 0.02
 billboard = 2
 double_sided = false
@@ -363,17 +420,38 @@ script = ExtResource("11_dude_script")
 walking_texture = ExtResource("11_dude_walk")
 
 [node name="col_Highrise" parent="." instance=ExtResource("11_jfr8b")]
-transform = Transform3D(450, 0, 0, 0, 450, 0, 0, 0, 450, 25.18142, 1.6907578, 55.558784)
+transform = Transform3D(450, 0, 0, 0, 450, 0, 0, 0, 450, 25.18142, 1.6907578, 581.18396)
 
 [node name="col_Land" type="MeshInstance3D" parent="."]
 transform = Transform3D(3, 0, 0, 0, -0.013159744, 4.9998918, 0, -1.9999567, -0.03289936, -273.1125, 0, -149.45969)
 mesh = ExtResource("13_4b8vk")
-
-[node name="col_Building2" parent="." instance=ExtResource("14_5f46o")]
-transform = Transform3D(350, 0, 0, 0, 350, 0, 0, 0, 350, 15.517, 10.85874, -187.21338)
-
-[node name="col_BridgeSegment" parent="." instance=ExtResource("15_q0kgd")]
-transform = Transform3D(-1.2261858, 0, -59.987465, 0, 59.999996, 0, 59.987465, 0, -1.2261858, -10.32151, -1.3741431, -4.132701)
+surface_material_override/0 = SubResource("StandardMaterial3D_5f46o")
 
 [node name="col_Tree" parent="." instance=ExtResource("16_3mg7b")]
-transform = Transform3D(80, 0, 0, 0, 80, 0, 0, 0, 80, 7.325511, 2.4816122, -12.810239)
+transform = Transform3D(80, 0, 0, 0, 80, 0, 0, 0, 80, 7.325511, 13.241761, -220.75452)
+
+[node name="col_Tree2" parent="." instance=ExtResource("16_3mg7b")]
+transform = Transform3D(0, 0, 0, 0, 0, 0, 0, 0, 0, 1.7683935, 12.055177, -206.96893)
+
+[node name="col_Tree3" parent="." instance=ExtResource("16_3mg7b")]
+transform = Transform3D(-79.69447, 0, 6.984989, 0, 79.99999, 0, -6.984989, 0, -79.69447, 12.198337, 12.055177, -212.09975)
+
+[node name="col_Tree4" parent="." instance=ExtResource("16_3mg7b")]
+transform = Transform3D(-149.42714, 0, 13.096859, 0, 150, 0, -13.096859, 0, -149.42714, 11.4664755, 10.421399, -176.20557)
+
+[node name="scol_Bridge" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.2, 0, 0, 0, -8.742278e-09, 0.2, 0, -0.2, -8.742278e-09, -90.51369, 2.5213394, -205.20174)
+mesh = ExtResource("15_q0kgd")
+
+[node name="Forklift" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.2, 0, 0, 0, -8.742278e-09, 0.2, 0, -0.2, -8.742278e-09, -29.717, 11.612326, -190.674)
+mesh = ExtResource("16_ur4gu")
+
+[node name="Sprite3DTree" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.07713, 13.288919, -164.69505)
+billboard = 2
+alpha_cut = 1
+alpha_antialiasing_mode = 1
+alpha_antialiasing_edge = 0.65
+texture_filter = 2
+texture = ExtResource("17_ur4gu")

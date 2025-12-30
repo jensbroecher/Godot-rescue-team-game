@@ -1,0 +1,15 @@
+[remap]
+
+importer="import_gif_to_sprite_frames"
+type="SpriteFrames"
+uid="uid://cx5mvmlemxhnk"
+path="res://.godot/imported/Preview2.gif-97bd9f1b21f29ec627b957ceb4c592af.tres"
+
+[deps]
+
+source_file="res://Animated Men Characters - Feb 2019/Preview2.gif"
+dest_files=["res://.godot/imported/Preview2.gif-97bd9f1b21f29ec627b957ceb4c592af.tres"]
+
+[params]
+
+frames_per_second=30

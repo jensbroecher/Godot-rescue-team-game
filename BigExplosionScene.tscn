@@ -22,7 +22,7 @@ size = Vector2(0.5, 0.5)
 [node name="Explosion1" type="GPUParticles3D" parent="."]
 transform = Transform3D(0.996103, 0, 0, 0, 0.996103, 0, 0, 0, 1, -0.00112057, -0.00427759, -0.00190479)
 material_override = ExtResource("1_an4hs")
-amount = 60
+amount = 120
 lifetime = 3.0
 explosiveness = 1.0
 randomness = 0.9
@@ -38,7 +38,7 @@ one_shot = true
 [node name="Explosion2" type="GPUParticles3D" parent="."]
 transform = Transform3D(0.996103, 0, 0, 0, 0.996103, 0, 0, 0, 1, -0.00112057, -0.00427759, -0.00190479)
 material_override = ExtResource("1_an4hs")
-amount = 30
+amount = 60
 lifetime = 3.0
 randomness = 0.9
 fixed_fps = 60
@@ -49,3 +49,4 @@ draw_pass_1 = SubResource("QuadMesh_16uck")
 billboard = 1
 emitting = true
 one_shot = true
+

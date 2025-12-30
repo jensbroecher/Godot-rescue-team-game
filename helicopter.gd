@@ -38,8 +38,8 @@ extends CharacterBody3D
 @export var grounded_clearance_scale: float = 0.05
 @export var explosion_scene: PackedScene
 @export var enable_downwash: bool = false
-@export var enable_rotor_disc_blur: bool = false
-@export var mission_radius: float = 250.0
+@export var enable_rotor_disc_blur: bool = true
+@export var mission_radius: float = 2500.0
 @export var mission_warning_radius: float = 200.0
 @export var auto_return_speed_multiplier: float = 1.2
 @export var auto_return_turn_rate_scale: float = 1.6
@@ -67,7 +67,7 @@ var start_ready: bool = false
 var precise_collision_built: bool = false
 var engines_on: bool = false
 var start_sequence_in_progress: bool = false
-var rotor_blur_nodes: Array[MeshInstance3D] = []
+var rotor_blur_nodes: Array[Node3D] = []
 var downwash_nodes: Array[GPUParticles3D] = []
 var in_safe_zone: bool = false
 var sfx_crashes: Array[AudioStreamPlayer3D] = []
@@ -77,6 +77,7 @@ var splash_fx: GPUParticles3D
 var fountain_fx: GPUParticles3D
 var simple_box_size: Vector3 = Vector3.ZERO
 var simple_box_center: Vector3 = Vector3.ZERO
+var crash_explosion_instance: Node3D = null
 var was_grounded: bool = false
 var aligned_this_grounding: bool = false
 var mission_start: Vector3 = Vector3.ZERO
@@ -142,8 +143,75 @@ func _ready() -> void:
 	splash_fx = get_node_or_null("WaterSplash")
 	fountain_fx = get_node_or_null("WaterFountain")
 	mission_start = global_position
-	if mission_radius > 0.0 and (mission_warning_radius <= 0.0 or mission_warning_radius > mission_radius):
-		mission_warning_radius = mission_radius * 0.8
+	if mission_radius > 0.0:
+		mission_warning_radius = mission_radius * 0.95
+	
+	# Get the scene-embedded explosion instance OR create it if missing
+	crash_explosion_instance = get_node_or_null("BigExplosionInstance")
+	
+	if !crash_explosion_instance:
+		# FALLBACK 1: Use Exported Scene
+		if explosion_scene:
+			crash_explosion_instance = explosion_scene.instantiate()
+		else:
+			# FALLBACK 2: Force load from path
+			var forced_scene = load("res://BigExplosionScene.tscn")
+			if forced_scene:
+				crash_explosion_instance = forced_scene.instantiate()
+		
+		if crash_explosion_instance:
+			crash_explosion_instance.name = "BigExplosionRuntime"
+			add_child(crash_explosion_instance)
+
+	if crash_explosion_instance:
+		crash_explosion_instance.visible = false
+		if crash_explosion_instance is Node3D:
+			var n3 := crash_explosion_instance as Node3D
+			# Ensure particles are not emitting
+			for child in n3.get_children():
+				if child is GPUParticles3D:
+					child.emitting = false
+					child.one_shot = true
+	
+	# Stop legacy effect if present
+	if explosion_fx:
+		explosion_fx.emitting = false
+	
+	_setup_reflective_body()
+
+func _setup_reflective_body() -> void:
+	var body := get_node_or_null("Heli Body")
+	if body == null:
+		return
+	var stack: Array[Node] = [body]
+	while stack.size() > 0:
+		var n: Node = stack.pop_back()
+		if n is MeshInstance3D:
+			var mi := n as MeshInstance3D
+			# Check material overrides
+			if mi.material_override:
+				_make_material_reflective(mi.material_override)
+			
+			# Check surface materials
+			if mi.mesh:
+				for i in range(mi.mesh.get_surface_count()):
+					var mat := mi.get_active_material(i)
+					if mat:
+						_make_material_reflective(mat)
+		
+		for ch in n.get_children():
+			stack.append(ch)
+
+func _make_material_reflective(mat: Material) -> void:
+	if mat is BaseMaterial3D:
+		var sm := mat as BaseMaterial3D
+		# Very subtle reflection: high roughness, low metallic
+		sm.roughness = 0.6
+		sm.metallic = 0.1
+		sm.specular = 0.5
+		# Ensure it's transparent to see through if needed, but reflection is priority
+		# sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		# sm.albedo_color.a = 0.3
 
 func _physics_process(delta: float) -> void:
 	# If we are in the falling crash sequence, apply gravity and count down
@@ -151,10 +219,11 @@ func _physics_process(delta: float) -> void:
 		crash_timer += delta
 		velocity.y -= gravity * delta
 		move_and_slide()
-		if disable_collisions_during_crash and !collisions_disabled_after_crash and crash_timer > 0.05:
-			collision_layer = 0
-			collision_mask = 0
-			collisions_disabled_after_crash = true
+		# REMOVED: Do not disable collisions. Let the wreckage hit the ground and stop.
+		# if disable_collisions_during_crash ...
+		# 	collision_layer = 0
+		# 	collision_mask = 0
+		# 	collisions_disabled_after_crash = true
 		if crash_timer < crash_flip_duration:
 			rotate(crash_flip_axis, crash_spin_rate * delta)
 		if crash_timer >= crash_delay:
@@ -174,6 +243,10 @@ func _physics_process(delta: float) -> void:
 	if !crashed_falling and global_position.y <= water_level + water_crash_margin:
 		start_crash()
 		return
+
+	# Debug crash key
+	if Input.is_key_pressed(KEY_K):
+		start_crash()
 
 	var grounded: bool = is_on_floor() or _is_ground_close(1.0)
 	var joy_y_debug = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
@@ -200,13 +273,14 @@ func _physics_process(delta: float) -> void:
 	rotor_speed = move_toward(rotor_speed, rotor_target, rate * delta)
 	if rotor_blur_nodes.size() > 0:
 		var blur: float = clamp((rotor_speed - 0.6) / 0.4, 0.0, 1.0)
+		if !enable_rotor_disc_blur:
+			blur = 0.0
+
 		for rb in rotor_blur_nodes:
-			if !enable_rotor_disc_blur:
-				rb.visible = false
-				continue
-			if rb and rb.material_override:
-				rb.material_override.set_shader_parameter("blur_strength", blur)
-			rb.visible = blur > 0.01
+			if rb:
+				rb.visible = true
+				if rb.material_override:
+					rb.material_override.set_shader_parameter("blur_strength", blur)
 	
 	# Start sequence logic
 	if wants_spin and !engines_on and !start_sequence_in_progress:
@@ -242,7 +316,12 @@ func _physics_process(delta: float) -> void:
 	if rotor_rotation_rate > 0.0 and rotor_nodes.size() > 0:
 		for rn in rotor_nodes:
 			if rn != null:
-				rn.rotate_y(rotor_rotation_rate * rotor_speed * delta)
+				if rn.name == "TailRotor":
+					# Tail rotor usually spins faster and on X axis
+					# Adjusted multiplier to avoid aliasing (wagon-wheel effect)
+					rn.rotate_x(rotor_rotation_rate * rotor_speed * delta * 1.0)
+				else:
+					rn.rotate_y(rotor_rotation_rate * rotor_speed * delta)
 	if enable_downwash and downwash_nodes.size() > 0:
 		var near_ground := _is_ground_close(4.0)
 		for dwn in downwash_nodes:
@@ -263,6 +342,8 @@ func _physics_process(delta: float) -> void:
 	if current_fuel < 0.0:
 		current_fuel = 0.0
 	emit_signal("fuel_changed", current_fuel, max_fuel)
+
+
 
 	if current_fuel <= 0.0:
 		start_crash()
@@ -445,16 +526,44 @@ func start_crash() -> void:
 	if sfx_start and sfx_start.playing:
 		sfx_start.stop()
 	var at_water: bool = global_position.y < water_level + 0.2
-	var epos: Vector3 = global_position + Vector3(0, 0.5, 0)
+	
+	# Determine explosion position - Robust approach
+	# Use simple_box_size (calculated AABB) for accurate world sizing
+	# Fallback to a reasonable default if not calculated yet
+	var box_size_ref: Vector3 = simple_box_size if simple_box_size != Vector3.ZERO else Vector3(5, 5, 5)
+	var max_dim: float = max(box_size_ref.x, max(box_size_ref.y, box_size_ref.z))
+	
+	# We will attach the explosion to the helicopter itself so it travels with it
+	# This avoids any world-space positioning errors
+	
 	var p_init := get_parent()
+	# Sound effects can stay in world space (p_init) because they don't need to move visibly
 	if p_init:
 		var aps_init := AudioStreamPlayer3D.new()
 		aps_init.unit_size = 1.0
 		aps_init.bus = "Master"
 		aps_init.volume_db = 12.0
 		p_init.add_child(aps_init)
-		aps_init.global_transform = Transform3D(Basis.IDENTITY, epos)
-		var st_path := "res://WaterCrash.mp3" if at_water else ("res://Crash%d.mp3" % (1 + int(randi() % 3)))
+		aps_init.global_transform = Transform3D(Basis.IDENTITY, global_position)
+		aps_init.global_transform = Transform3D(Basis.IDENTITY, global_position)
+		
+		# Dynamic Audio Selection
+		var st_path := ""
+		if at_water:
+			if FileAccess.file_exists("res://sounds/large-underwater-explosion-454253.mp3"):
+				st_path = "res://sounds/large-underwater-explosion-454253.mp3"
+			elif FileAccess.file_exists("res://UnderwaterExplosion.mp3"):
+				st_path = "res://UnderwaterExplosion.mp3"
+			else:
+				st_path = "res://WaterCrash.mp3"
+		else:
+			if FileAccess.file_exists("res://sounds/massive-explosion-3-397984.mp3"):
+				st_path = "res://sounds/massive-explosion-3-397984.mp3"
+			elif FileAccess.file_exists("res://Explosion.mp3"):
+				st_path = "res://Explosion.mp3"
+			else:
+				st_path = "res://Crash%d.mp3" % (1 + int(randi() % 3))
+				
 		var st_init := load(st_path)
 		if st_init is AudioStream:
 			aps_init.stream = st_init
@@ -472,7 +581,6 @@ func start_crash() -> void:
 			if fountain_fx:
 				fountain_fx.global_position = Vector3(global_position.x, water_level, global_position.z)
 				fountain_fx.emitting = true
-			epos = Vector3(global_position.x, water_level, global_position.z)
 		else:
 			if sfx_crashes.size() > 0:
 				var idx: int = int(randi() % sfx_crashes.size())
@@ -481,17 +589,46 @@ func start_crash() -> void:
 					player.stop()
 					player.volume_db = -60.0
 					player.play()
-		if explosion_scene != null:
-			var inst := explosion_scene.instantiate()
-			var p := get_parent()
-			if p:
-				p.add_child(inst)
-				if inst is Node3D:
-					var n3 := inst as Node3D
-					n3.global_transform = Transform3D(Basis.IDENTITY, epos)
-					n3.scale = Vector3(80, 80, 80)
-			var t = get_tree().create_timer(3.0)
-			t.timeout.connect(_on_free_explosion.bind(inst))
+		
+		# Trigger pre-instantiated explosion
+		if crash_explosion_instance:
+			crash_explosion_instance.visible = true
+			if crash_explosion_instance is Node3D:
+				var n3 := crash_explosion_instance as Node3D
+				# Use Top Level to detach from helicopter movement (stays at crash site)
+				n3.top_level = true
+				
+				# ROBUST POSITIONING: Use current global position + offset
+				# Ignore simple_box_center as it seems unreliable
+				var visual_center_global := to_global(Vector3(0, 2.0, 0))
+				n3.global_position = visual_center_global
+				
+				# RESET SCALING: Use hardcoded large value as verified base
+				var expl_scale: float = 25.0
+				n3.scale = Vector3(expl_scale, expl_scale, expl_scale)
+				
+				# Enable emission
+				for child in n3.get_children():
+					if child is GPUParticles3D:
+						child.restart()
+						child.emitting = true
+			
+				# ADD CENTER SPRITE SHEET EXPLOSION (One Shot, Large)
+				_add_sprite_sheet_effect(n3, 15.0, true)
+				
+				# DETACH CAMERA Logic
+				var cam = get_viewport().get_camera_3d()
+				if cam:
+					cam.top_level = true
+					# Aggressively disable any follow scripts
+					cam.set_process(false)
+					cam.set_physics_process(false)
+			
+			# No need to free it, it will just play once and stop (one_shot)
+			# But we can hide it after some time to be safe
+			var t = get_tree().create_timer(4.0)
+			t.timeout.connect(func(): if crash_explosion_instance: crash_explosion_instance.visible = false)
+
 	# begin falling with flip and jolt
 	crashed_falling = true
 	crash_timer = 0.0
@@ -505,6 +642,235 @@ func start_crash() -> void:
 	velocity.z = jz
 	crash_flip_axis = Vector3(randf() * 2.0 - 1.0, randf() * 2.0 - 1.0, randf() * 2.0 - 1.0).normalized()
 	crash_spin_rate = abs(crash_spin_rate) * (-1.0 if randf() < 0.5 else 1.0)
+	
+	_hide_visuals()
+	
+	# Debris needs a world position to spawn at - use calculated global center
+	# Re-calculate or reuse the robust position
+	var spawn_pos: Vector3 = to_global(Vector3(0, 2.0, 0))
+	spawn_debris(spawn_pos, box_size_ref)
+
+func _hide_visuals() -> void:
+	# Robustly hide all visual elements
+	for child in get_children():
+		if child is GeometryInstance3D or child is Sprite3D or child.name.contains("Rotor") or child.name == "Heli Body":
+			child.visible = false
+	
+	if enable_downwash:
+		for d in downwash_nodes:
+			if d:
+				d.emitting = false
+
+func spawn_debris(spawn_center: Vector3, box_size: Vector3) -> void:
+	var debris_count := 40
+	var parent = get_parent()
+	if !parent:
+		return
+	
+	var debris_script = load("res://debris.gd")
+	var max_dim_debris: float = max(box_size.x, max(box_size.y, box_size.z))
+	
+	for i in range(debris_count):
+		var rb := RigidBody3D.new()
+		rb.set_script(debris_script)
+		rb.water_level = water_level
+		
+		var col := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		
+		# Make debris smaller and more numerous
+		# user report: "debris pieces ... are larger than the helicopter itself"
+		# Revert to small base sizes
+		var base_size := 0.4
+		if i == 0: 
+			base_size = 1.0 # Main chunk slightly larger
+		
+		# Scale debris delicately by object size
+		# e.g., for a 10m heli, debris might be 0.5m - 1.5m
+		var debris_scale_factor: float = 1.0 + (max_dim_debris * 0.02)
+		
+		var size_scale: Vector3 = Vector3(
+			randf_range(0.5, 1.5), 
+			randf_range(0.2, 0.8), 
+			randf_range(0.5, 1.5)
+		) * base_size * debris_scale_factor
+		
+		box.size = size_scale
+		col.shape = box
+		rb.add_child(col)
+		
+		var mesh_inst := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = size_scale
+		mesh_inst.mesh = mesh
+		
+		# Darker, metallic material
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(randf_range(0.1, 0.2), randf_range(0.1, 0.2), randf_range(0.1, 0.2))
+		mat.roughness = 0.7
+		mat.metallic = 0.8
+		mesh_inst.material_override = mat
+		
+		rb.add_child(mesh_inst)
+		
+		# CRITICAL FIX: Add to scene tree BEFORE setting global transform
+		parent.add_child(rb)
+		
+		# Initial transform - Use calculated center
+		# Now that it's in the tree, global_transform works correctly
+		rb.global_transform = Transform3D(global_transform.basis, spawn_center)
+		
+		# Spread them out based on the box size
+		var spread_range = box_size * 0.5
+		var spread_offset := Vector3(
+			randf_range(-1, 1) * spread_range.x, 
+			randf_range(-1, 1) * spread_range.y, 
+			randf_range(-1, 1) * spread_range.z
+		)
+		rb.global_position += spread_offset
+		
+		# Velocity
+		var explosion_force := Vector3(randf_range(-15, 15), randf_range(5, 20), randf_range(-15, 15))
+		rb.linear_velocity = velocity + explosion_force
+		rb.angular_velocity = Vector3(randf_range(-4, 4), randf_range(-4, 4), randf_range(-4, 4))
+		
+		# Add fire to more chunks (about 40% of them)
+		if i < debris_count * 0.4:
+			var fire = _add_fire_particles(rb, size_scale.x * 1.2)
+			rb.fire_particles = fire
+			
+		# Add sprite sheet effect to some chunks (about 20%)
+		if i < debris_count * 0.2:
+			_add_sprite_sheet_effect(rb, size_scale.x * 2.0)
+			
+		# Cleanup timer
+		var t := get_tree().create_timer(15.0)
+		t.timeout.connect(rb.queue_free)
+
+func _add_fire_particles(target: Node3D, scale_factor: float) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.albedo_color = Color(1.0, 0.6, 0.1, 1.0)
+	
+	# Use the robust RoundGradient resource
+	var grad_tex := load("res://RoundGradient.tres")
+	mat.albedo_texture = grad_tex
+	
+	# Ensure frame animation is disabled for single texture
+	mat.particles_anim_h_frames = 1
+	mat.particles_anim_v_frames = 1
+	mat.particles_anim_loop = false
+	
+	var quad := QuadMesh.new()
+	# Smaller particles relative to debris
+	quad.size = Vector2(0.5, 0.5) * scale_factor
+	
+	particles.draw_pass_1 = quad
+	particles.material_override = mat
+	
+	var process_mat := ParticleProcessMaterial.new()
+	process_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process_mat.emission_sphere_radius = scale_factor * 0.4
+	process_mat.direction = Vector3(0, 1, 0)
+	process_mat.spread = 25.0
+	
+	# Increase amount for denser fire (default is 8)
+	particles.amount = 32
+	particles.process_material = process_mat
+	process_mat.gravity = Vector3(0, 4.0, 0)
+	process_mat.initial_velocity_min = 1.0
+	process_mat.initial_velocity_max = 3.0
+	process_mat.scale_min = 0.5
+	process_mat.scale_max = 1.2
+	process_mat.angle_max = 360.0
+	process_mat.angular_velocity_max = 100.0
+	
+	# Simple Fade Out Gradient
+	var grad := Gradient.new()
+	grad.add_point(0.0, Color(1, 0.5, 0, 1))
+	grad.add_point(0.5, Color(1, 0.1, 0, 0.5)) # Start fading earlier
+	grad.add_point(1.0, Color(0, 0, 0, 0)) # Clean fade
+	var color_ramp_tex := GradientTexture1D.new()
+	color_ramp_tex.gradient = grad
+	process_mat.color_ramp = color_ramp_tex
+	
+	particles.process_material = process_mat
+	particles.process_material = process_mat
+	particles.amount = 200 # INCREASED BY A LOT
+	particles.lifetime = 1.2 # Longer life
+	particles.explosiveness = 0.05
+	particles.fixed_fps = 60
+	particles.local_coords = false # Leave trail
+	
+	target.add_child(particles)
+	particles.position = Vector3.ZERO
+	return particles
+
+func _add_sprite_sheet_effect(target: Node3D, scale_factor: float, is_one_shot: bool = false) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	
+	var sprite_tex := load("res://explosion sprite sheet.png")
+	mat.albedo_texture = sprite_tex
+	
+	# Assuming 5x5 sprite sheet - Adjust if needed
+	mat.particles_anim_h_frames = 5
+	mat.particles_anim_v_frames = 5
+	mat.particles_anim_loop = false
+	
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1.0, 1.0) * scale_factor
+	
+	particles.draw_pass_1 = quad
+	particles.material_override = mat
+	
+	var process_mat := ParticleProcessMaterial.new()
+	process_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process_mat.emission_sphere_radius = scale_factor * 0.3
+	process_mat.direction = Vector3(0, 1, 0)
+	process_mat.spread = 180.0
+	process_mat.gravity = Vector3(0, 2.0, 0)
+	process_mat.initial_velocity_min = 0.5
+	process_mat.initial_velocity_max = 1.5
+	process_mat.angle_max = 360.0
+	
+	# Play full animation over lifetime
+	process_mat.anim_speed_min = 1.0
+	process_mat.anim_speed_max = 1.0
+	
+	# Add Fade Out for sprite sheet particles too
+	var grad := Gradient.new()
+	grad.add_point(0.0, Color(1, 1, 1, 1))
+	grad.add_point(0.5, Color(1, 1, 1, 0.5))
+	grad.add_point(1.0, Color(0, 0, 0, 0))
+	var ramp_tex := GradientTexture1D.new()
+	ramp_tex.gradient = grad
+	process_mat.color_ramp = ramp_tex
+	
+	particles.process_material = process_mat
+	particles.amount = 4
+	particles.lifetime = 0.6
+	particles.fixed_fps = 60
+	particles.fixed_fps = 60
+	particles.local_coords = false
+	
+	if is_one_shot:
+		particles.one_shot = true
+		particles.emitting = true
+	
+	target.add_child(particles)
+	particles.position = Vector3.ZERO
+	return particles
 
 func crash() -> void:
 	# immediate crash (fallback)
@@ -676,7 +1042,7 @@ func _update_mission_area_state() -> Vector3:
 	var to_start := mission_start - global_position
 	to_start.y = 0.0
 	var distance := to_start.length()
-	var warning_threshold := mission_warning_radius if mission_warning_radius > 0.0 else mission_radius * 0.5
+	var warning_threshold := mission_warning_radius if mission_warning_radius > 0.0 else mission_radius * 3.5
 	var warn_now := distance >= warning_threshold
 	if warn_now != mission_warning_active:
 		mission_warning_active = warn_now
@@ -706,14 +1072,16 @@ func _find_rotor_nodes() -> Array[Node3D]:
 			if n.contains("rotor"):
 				result.append(c as Node3D)
 	rotor_blur_nodes.clear()
-	var rb1: MeshInstance3D = get_node_or_null("Rotor/RotorBlur")
-	var rb2: MeshInstance3D = get_node_or_null("Rotor2/RotorBlur")
+	var rb1: Node3D = get_node_or_null("Rotor")
+	var rb2: Node3D = get_node_or_null("Rotor2")
+	var rb3: Node3D = get_node_or_null("TailRotor")
 	if rb1:
 		rotor_blur_nodes.append(rb1)
 	if rb2:
 		rotor_blur_nodes.append(rb2)
-	for rb in rotor_blur_nodes:
-		rb.visible = false
+	if rb3:
+		rotor_blur_nodes.append(rb3)
+	# No longer hiding them initially, as they are the main rotors
 	return result
 func _on_free_explosion(n: Node) -> void:
 	if n != null and is_instance_valid(n):
