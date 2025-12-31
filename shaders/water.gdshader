@@ -262,7 +262,7 @@ void fragment()
 	ALBEDO.rgb = final_color;
 	METALLIC = metallic;
 	ROUGHNESS = roughness;
-	NORMAL = normal_blend;
+	NORMAL = normal_blendg
 	
 	// Fade edges
 	float dist_from_center = distance(vertex_uv, vec2(0.0)); // vertex_uv is centered around 0,0 for the plane? No, let's check vertex shader.

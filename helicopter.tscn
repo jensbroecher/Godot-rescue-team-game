@@ -35,13 +35,13 @@ explosion_scene = ExtResource("10_expl")
 transform = Transform3D(-133.98245, 0, -1.0271453e-05, 0, 133.69789, 0, 1.1713118e-05, 0, -117.49173, 2.1138217, -0.045719147, -0.14979362)
 
 [node name="Rotor" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.6996975, 5.831769, -4.037841)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.6996975, 5.9115725, -4.037841)
 material_override = SubResource("ShaderMaterial_rotor")
 axis = 1
 texture = ExtResource("2_blades")
 
 [node name="Rotor2" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.250999, 5.829434, -4.0534534)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.251, 5.912, -4.053)
 material_override = SubResource("ShaderMaterial_rotor")
 axis = 1
 texture = ExtResource("2_blades")
@@ -74,5 +74,3 @@ volume_db = 100.0
 [node name="SFX_WaterCrash" type="AudioStreamPlayer3D" parent="."]
 stream = ExtResource("9_wcr")
 volume_db = 100.0
-
-

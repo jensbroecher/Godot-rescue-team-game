@@ -8,9 +8,11 @@ extends CharacterBody3D
 @export var acceleration: float = 6.0
 @export var deceleration: float = 8.0
 @export var lift_acceleration: float = 6.0
+@export var max_lift_multiplier: float = 3.0
+@export var lift_multiplier_rate: float = 2.0 # Time to reach max speed in seconds
 @export var tilt_max_degrees: float = 12.0
 @export var tilt_speed: float = 6.0
-@export var max_altitude: float = 120.0
+@export var max_altitude: float = 4000.0
 @export var wobble_amplitude_deg: float = 1.0
 @export var wobble_frequency: float = 1.2
 @export var bob_amplitude: float = 0.2
@@ -43,6 +45,9 @@ extends CharacterBody3D
 @export var mission_warning_radius: float = 200.0
 @export var auto_return_speed_multiplier: float = 1.2
 @export var auto_return_turn_rate_scale: float = 1.6
+@export var crash_velocity_threshold: float = 8.0
+@export var boost_speed_multiplier: float = 2.0
+@export var jet_trail_offset: Vector3 = Vector3(0.8, 0.0, 1.5) # Positioning near engines/nacelles
 
 var current_fuel: float = 0.0
 var is_crashed: bool = false
@@ -58,11 +63,14 @@ var crash_flip_axis: Vector3 = Vector3(0, 0, 1)
 var wobble_time: float = 0.0
 var sustained_accum: float = 0.0
 var last_move_dir: Vector2 = Vector2.ZERO
+var lift_press_duration: float = 0.0
+var descent_press_duration: float = 0.0
 var rotor_speed: float = 0.0
 var rotor_nodes: Array[Node3D] = []
 var prev_rotor_speed: float = 0.0
 var sfx_flying: AudioStreamPlayer3D
 var sfx_start: AudioStreamPlayer3D
+var sfx_jet: AudioStreamPlayer3D
 var start_ready: bool = false
 var precise_collision_built: bool = false
 var engines_on: bool = false
@@ -74,6 +82,7 @@ var sfx_crashes: Array[AudioStreamPlayer3D] = []
 var sfx_watercrash: AudioStreamPlayer3D
 var explosion_fx: GPUParticles3D
 var splash_fx: GPUParticles3D
+var jet_trails: Array[GPUParticles3D] = []
 var fountain_fx: GPUParticles3D
 var simple_box_size: Vector3 = Vector3.ZERO
 var simple_box_center: Vector3 = Vector3.ZERO
@@ -83,6 +92,7 @@ var aligned_this_grounding: bool = false
 var mission_start: Vector3 = Vector3.ZERO
 var mission_warning_active: bool = false
 var auto_returning: bool = false
+var is_emergency_landing: bool = false
 
 signal fuel_changed(fuel: float, max_fuel: float)
 signal helicopter_crashed
@@ -91,6 +101,8 @@ signal mission_area_warning(active: bool)
 func _ready() -> void:
 	current_fuel = max_fuel
 	emit_signal("fuel_changed", current_fuel, max_fuel)
+	# FORCE override potential scene-saved value
+	max_altitude = 320.0
 	randomize()
 	rotor_nodes = _find_rotor_nodes()
 	var dw1: GPUParticles3D = get_node_or_null("Rotor/Downwash")
@@ -99,7 +111,7 @@ func _ready() -> void:
 		downwash_nodes.append(dw1)
 	if dw2:
 		downwash_nodes.append(dw2)
-	safe_margin = 0.06
+	safe_margin = 0.1
 	floor_snap_length = 0.25
 	rotor_speed = 0.0
 	prev_rotor_speed = 0.0
@@ -137,14 +149,47 @@ func _ready() -> void:
 			sfx_flying.volume_db = -6.0
 			sfx_flying.stop()
 	if sfx_start and sfx_start.stream:
-		sfx_start.volume_db = -6.0
+		sfx_start.volume_db = -60.0
 		sfx_start.stop()
+	
+	# Setup Jet Sound
+	if FileAccess.file_exists("res://sounds/jet-engine.mp3"):
+		sfx_jet = AudioStreamPlayer3D.new()
+		add_child(sfx_jet)
+		sfx_jet.stream = load("res://sounds/jet-engine.mp3")
+		sfx_jet.unit_size = 1.0
+		sfx_jet.bus = "Master"
+		sfx_jet.unit_size = 1.0
+		sfx_jet.bus = "Master"
+		sfx_jet.volume_db = -60.0
+	
+	# Setup Jet Trails
+	# Setup Jet Trails (More numerous, at rotor centers)
+	var r1 = get_node_or_null("Rotor")
+	var r2 = get_node_or_null("Rotor2")
+	# If specific rotors found, use them. Else use offsets.
+	var trail_points = []
+	if r1: trail_points.append(r1.position)
+	else: trail_points.append(Vector3(-jet_trail_offset.x, jet_trail_offset.y, jet_trail_offset.z))
+	
+	if r2: trail_points.append(r2.position)
+	else: trail_points.append(Vector3(jet_trail_offset.x, jet_trail_offset.y, jet_trail_offset.z))
+		
+	for pos in trail_points:
+		var trail = _create_jet_trail()
+		add_child(trail)
+		# Correct placement: At the rotor position, slightly lower/back?
+		# User said "where the two main rotor centers are".
+		# If we child to heli, we just use the local position of the rotor.
+		trail.position = pos + Vector3(0, -0.5, 0.5) # Slight offset to be "under" or "behind" rotor hub
+		jet_trails.append(trail)
+	
 	explosion_fx = get_node_or_null("ExplosionParticles")
 	splash_fx = get_node_or_null("WaterSplash")
 	fountain_fx = get_node_or_null("WaterFountain")
 	mission_start = global_position
 	if mission_radius > 0.0:
-		mission_warning_radius = mission_radius * 0.95
+		mission_warning_radius = mission_radius * 0.9
 	
 	# Get the scene-embedded explosion instance OR create it if missing
 	crash_explosion_instance = get_node_or_null("BigExplosionInstance")
@@ -213,7 +258,52 @@ func _make_material_reflective(mat: Material) -> void:
 		# sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		# sm.albedo_color.a = 0.3
 
+func _create_jet_trail() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.emitting = false
+	p.amount = 200
+	p.lifetime = 0.5
+	p.local_coords = false # Trails stay in world space
+	p.draw_order = GPUParticles3D.DRAW_ORDER_VIEW_DEPTH
+	
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.vertex_color_use_as_albedo = true
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	if FileAccess.file_exists("res://RoundParticle.png"):
+		mat.albedo_texture = load("res://RoundParticle.png")
+	
+	p.material_override = mat
+	
+	var pm := ParticleProcessMaterial.new()
+	pm.gravity = Vector3.ZERO
+	pm.direction = Vector3(0, 0, 1) # Z is usually forward/back
+	pm.spread = 15.0
+	pm.initial_velocity_min = 2.0
+	pm.initial_velocity_max = 5.0
+	pm.scale_min = 0.5
+	pm.scale_max = 1.0
+	# Color ramp: Blue/White to Transparent (Original Non-HDR)
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.2, 0.6, 1.0, 1.0)) # Bright Blue
+	grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0)) # Fade out
+	var grad_tex := GradientTexture1D.new()
+	grad_tex.gradient = grad
+	pm.color_ramp = grad_tex
+	
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.5, 0.5)
+	p.draw_pass_1 = quad
+	
+	p.process_material = pm
+	return p
+
 func _physics_process(delta: float) -> void:
+	# Define boost state early for use in fuel and movement
+	var is_boosting: bool = Input.is_key_pressed(KEY_SPACE) or Input.is_joy_button_pressed(0, JOY_BUTTON_A) or Input.is_joy_button_pressed(0, JOY_BUTTON_RIGHT_SHOULDER)
+
 	# If we are in the falling crash sequence, apply gravity and count down
 	if crashed_falling:
 		crash_timer += delta
@@ -267,7 +357,12 @@ func _physics_process(delta: float) -> void:
 		rotor_target = 1.0
 	elif engines_on:
 		rotor_target = 1.0
-	if grounded and !wants_spin and !start_sequence_in_progress:
+	
+	# Emergency Landing Rotor Logic: Keep spinning slowly (windmilling)
+	if is_emergency_landing:
+		rotor_target = 0.4 # Slow spin, not enough for lift (min_takeoff is 0.8)
+		
+	if grounded and !wants_spin and !start_sequence_in_progress and !is_emergency_landing:
 		rotor_target = 0.0
 	var rate: float = rotor_spinup_rate if rotor_target > rotor_speed else rotor_spindown_rate
 	rotor_speed = move_toward(rotor_speed, rotor_target, rate * delta)
@@ -338,16 +433,28 @@ func _physics_process(delta: float) -> void:
 
 	# Drain fuel only when engines running
 	if engines_on and rotor_speed > min_takeoff_rotor_speed * 0.5:
-		current_fuel -= fuel_drain_rate * delta
+		var drain_mult: float = 2.0 if is_boosting else 1.0 # Boost consumes 2x fuel
+		current_fuel -= fuel_drain_rate * drain_mult * delta
 	if current_fuel < 0.0:
 		current_fuel = 0.0
-	emit_signal("fuel_changed", current_fuel, max_fuel)
-
-
-
+	
 	if current_fuel <= 0.0:
-		start_crash()
-		return
+		if !is_emergency_landing:
+			is_emergency_landing = true
+			engines_on = false # Cut engines
+			# Optional: Play a "sputter" sound or just stop the engine sound
+	emit_signal("fuel_changed", current_fuel, max_fuel)
+	
+	# Emergency Landing Logic overrides vertical physics
+	if is_emergency_landing:
+		# Descent rate: fall faster -> -15.0
+		var descent_speed = -15.0 
+		velocity.y = move_toward(velocity.y, descent_speed, 10.0 * delta)
+		# NOTE: Horizontal damping is removed to allow steering, 
+		# but we will block "Up" inputs below.
+
+	# is_emergency_landing DOES NOT RETURN anymore, allowing steering logic below to run
+	# We just need to selectively block Lift/Throttle up.
 
 	var forward = -transform.basis.z.normalized()
 	var horizontal_forward = Vector3(forward.x, 0.0, forward.z).normalized()
@@ -355,24 +462,81 @@ func _physics_process(delta: float) -> void:
 	var horizontal_right = Vector3(right.x, 0.0, right.z).normalized()
 	var return_vector := _update_mission_area_state()
 	var input_velocity: Vector3 = Vector3.ZERO
+	var target_tilt: float = 0.0
+	var target_lean: float = 0.0
+	
+	# Jet Boost Logic
+	# is_boosting is defined at top of function
+	var current_move_speed = move_speed
+	
+	# Only allow boost if we have ACTIVE input or significant HORIZONTAL movement
+	# This prevents boosting when just sinking (vertical velocity only)
+	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
+	
+	# Check raw input because input_velocity is not yet calculated for this frame
+	var input_active: bool = false
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_D):
+		input_active = true
+	# Also allow for Q (Lift) - User specifically asked for Vertical Boost
+	if Input.is_key_pressed(KEY_Q):
+		input_active = true
+		
+	if Input.get_vector("move_left", "move_right", "move_forward", "move_backward").length_squared() > 0.1:
+		input_active = true
+	
+	# Prevent boosting if out of fuel
+	var can_boost = (input_active or horizontal_speed > 5.0) and !is_emergency_landing
+	
+	if is_boosting and can_boost:
+		current_move_speed *= boost_speed_multiplier
+		
+		# Enable Trails
+		for t in jet_trails:
+			t.emitting = true
+			
+		if sfx_jet and !sfx_jet.playing:
+			sfx_jet.play()
+			var tw = create_tween()
+			tw.tween_property(sfx_jet, "volume_db", 10.0, 0.4) # Increased to 10.0dB
+	else:
+		# Disable Trails
+		for t in jet_trails:
+			t.emitting = false
+			
+		if sfx_jet and sfx_jet.playing and sfx_jet.volume_db > -20.0:
+			var tw = create_tween()
+			tw.tween_property(sfx_jet, "volume_db", -60.0, 0.4).finished.connect(sfx_jet.stop)
 
 	# Keyboard Input
 	if Input.is_key_pressed(KEY_W):
-		input_velocity += horizontal_forward * move_speed
+		input_velocity += horizontal_forward * current_move_speed
 	if Input.is_key_pressed(KEY_S):
-		input_velocity -= horizontal_forward * move_speed
+		input_velocity -= horizontal_forward * current_move_speed
 
 	if Input.is_key_pressed(KEY_Q):
-		if rotor_speed >= min_takeoff_rotor_speed:
-			input_velocity.y += lift_speed
+		# Deny lift during emergency landing
+		if !is_emergency_landing and rotor_speed >= min_takeoff_rotor_speed:
+			lift_press_duration += delta
+			var lift_mult = lerp(1.0, max_lift_multiplier, clamp(lift_press_duration / lift_multiplier_rate, 0.0, 1.0))
+			var current_lift_speed = lift_speed
+			if is_boosting and can_boost:
+				current_lift_speed *= boost_speed_multiplier
+			input_velocity.y += current_lift_speed * lift_mult
+	else:
+		lift_press_duration = 0.0
+		
 	if Input.is_key_pressed(KEY_E):
-		input_velocity.y -= lift_speed
+		descent_press_duration += delta
+		var desc_mult = lerp(1.0, max_lift_multiplier, clamp(descent_press_duration / lift_multiplier_rate, 0.0, 1.0))
+		input_velocity.y -= lift_speed * desc_mult
+	else:
+		descent_press_duration = 0.0
 
 	if Input.is_key_pressed(KEY_SHIFT):
 		if Input.is_key_pressed(KEY_A):
-			input_velocity += -horizontal_right * move_speed
+			input_velocity += -horizontal_right * current_move_speed
 		if Input.is_key_pressed(KEY_D):
-			input_velocity += horizontal_right * move_speed
+			input_velocity += horizontal_right * current_move_speed
 
 	# Controller Input
 	var deadzone: float = 0.2
@@ -383,10 +547,10 @@ func _physics_process(delta: float) -> void:
 	
 	if abs(joy_y) > deadzone:
 		# Invert Y because negative axis is usually up/forward
-		input_velocity += horizontal_forward * move_speed * -joy_y
+		input_velocity += horizontal_forward * current_move_speed * -joy_y
 		
 	if abs(joy_x) > deadzone:
-		input_velocity += horizontal_right * move_speed * joy_x
+		input_velocity += horizontal_right * current_move_speed * joy_x
 
 	# Triggers: Lift
 	var trigger_right = Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT)
@@ -394,10 +558,21 @@ func _physics_process(delta: float) -> void:
 	
 	if trigger_right > deadzone:
 		if rotor_speed >= min_takeoff_rotor_speed:
-			input_velocity.y += lift_speed * trigger_right
+			# For controller, we also ramp up if they hold it
+			# Or we could map pressure to speed, but let's stick to the "longer pressed" requested logic for consistency
+			# lift_press_duration is shared logic, but let's ensure it works for both
+			if !Input.is_key_pressed(KEY_Q): # Avoid double counting if both used
+				lift_press_duration += delta
+			
+			var lift_mult = lerp(1.0, max_lift_multiplier, clamp(lift_press_duration / lift_multiplier_rate, 0.0, 1.0))
+			input_velocity.y += lift_speed * trigger_right * lift_mult
 			
 	if trigger_left > deadzone:
-		input_velocity.y -= lift_speed * trigger_left
+		# Shared descent acceleration logic
+		if !Input.is_key_pressed(KEY_E):
+			descent_press_duration += delta
+		var desc_mult = lerp(1.0, max_lift_multiplier, clamp(descent_press_duration / lift_multiplier_rate, 0.0, 1.0))
+		input_velocity.y -= lift_speed * trigger_left * desc_mult
 
 	var wobble_active := engines_on && (!grounded) && (global_position.y >= airborne_wobble_min_height)
 	var wobble_scale: float = airborne_wobble_multiplier if wobble_active else 0.0
@@ -425,12 +600,13 @@ func _physics_process(delta: float) -> void:
 	if auto_returning and mission_radius > 0.0:
 		var return_dir := return_vector.normalized()
 		if return_dir != Vector3.ZERO:
-			input_velocity.x = return_dir.x * move_speed * auto_return_speed_multiplier
-			input_velocity.z = return_dir.z * move_speed * auto_return_speed_multiplier
+			input_velocity.x = return_dir.x * current_move_speed * auto_return_speed_multiplier
+			input_velocity.z = return_dir.z * current_move_speed * auto_return_speed_multiplier
 			sustained_accum = 0.0
 
-	if global_position.y >= max_altitude:
-		input_velocity.y = min(input_velocity.y, 0.0)
+	# REMOVED: Hard velocity clamp at ceiling
+	# if global_position.y >= max_altitude:
+	# 	input_velocity.y = min(input_velocity.y, 0.0)
 
 	var accel_factor = acceleration if input_velocity.length() > 0.0 else deceleration
 	
@@ -450,21 +626,38 @@ func _physics_process(delta: float) -> void:
 	if rotor_speed >= min_takeoff_rotor_speed:
 		velocity.y = lerp(velocity.y, input_velocity.y, lift_acceleration * delta)
 	
-	if grounded and !wants_spin:
-		velocity.y = move_toward(velocity.y, 0.0, lift_acceleration * 2.0 * delta)
+	if grounded and input_velocity.y <= 0:
+		# Force sticky ground contact to prevent jitter
+		velocity.y = -1.0
+	
+	var velocity_before_move = velocity
 	move_and_slide()
+	
 	if grounded and !wants_spin:
 		velocity.x = move_toward(velocity.x, 0.0, deceleration * 2.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, deceleration * 2.0 * delta)
 	if !is_crashed and precise_collision_built:
 		var slide_count := get_slide_collision_count()
+		# Calculate impact force based on velocity change during this frame's physics step
+		var impact_vector = velocity_before_move - velocity
+		# Ignore small vertical changes due to gravity/slopes which might look like impacts
+		# impact_vector.y = 0 # Optional: maintain vertical crash sensitivity?
+		var impact_speed = impact_vector.length()
+
 		for i in range(slide_count):
 			var col := get_slide_collision(i)
 			var n := col.get_normal()
 			var is_floor := n.dot(Vector3.UP) > 0.7
+			
 			if !in_safe_zone and !is_floor:
-				start_crash()
-				break
+				# Only crash if we hit hard enough
+				if impact_speed > crash_velocity_threshold:
+					print("Crash triggered! Impact speed: ", impact_speed, " Threshold: ", crash_velocity_threshold)
+					start_crash()
+					break
+				else:
+					# Minor collision - maybe play a bump sound?
+					pass
 
 	if auto_returning and mission_radius > 0.0:
 		var return_dir := return_vector.normalized()
@@ -486,21 +679,34 @@ func _physics_process(delta: float) -> void:
 		if rot != 0.0:
 			rotate_y(rot)
 
-	var speed_factor = clamp(Vector3(velocity.x, 0.0, velocity.z).dot(horizontal_forward) / move_speed, -1.0, 1.0)
+	var speed_factor = clamp(Vector3(velocity.x, 0.0, velocity.z).dot(horizontal_forward) / current_move_speed, -1.0, 1.0)
 	var desired_tilt = 0.0 if grounded else (-tilt_max_degrees * speed_factor + sin(wobble_time * wobble_frequency) * (wobble_amplitude_deg * wobble_scale))
 	rotation_degrees.x = lerp(rotation_degrees.x, desired_tilt, tilt_speed * delta)
 
-	var lateral_factor = clamp(Vector3(velocity.x, 0.0, velocity.z).dot(horizontal_right) / move_speed, -1.0, 1.0)
+	var lateral_factor = clamp(Vector3(velocity.x, 0.0, velocity.z).dot(horizontal_right) / current_move_speed, -1.0, 1.0)
 	var lean_factor = lateral_factor if Input.is_key_pressed(KEY_SHIFT) else 0.0
 	var desired_roll = (-strafe_lean_degrees * lean_factor) + (sin(wobble_time * wobble_frequency * 1.5) * (wobble_amplitude_deg * wobble_scale) * 0.6)
 	rotation_degrees.z = lerp(rotation_degrees.z, desired_roll, tilt_speed * delta)
+	# Soft Ceiling Logic - Velocity Dampening
+	# "gradually reduce the climb rate over that altitude"
 	if global_position.y > max_altitude:
-		global_position.y = max_altitude
-		if velocity.y > 0.0:
-			velocity.y = 0.0
+		# Calculate how far we are into the "buffer zone" (e.g., 50 units)
+		var buffer: float = 50.0
+		var over: float = global_position.y - max_altitude
+		# 0.0 at max_altitude, 1.0 at max_altitude + buffer
+		var damp_factor: float = clamp(1.0 - (over / buffer), 0.0, 1.0)
+		
+		# Only dampen upward velocity
+		if velocity.y > 0:
+			velocity.y *= damp_factor
+			
+		# Also dampen input velocity for lift to prevent fighting
+		if input_velocity.y > 0:
+			input_velocity.y *= damp_factor
 	if grounded:
 		if !use_precise_collision and !wants_spin:
-			_align_to_ground_soft(2.0, 0.35)
+			# _align_to_ground_soft(2.0, 0.35)
+			pass
 		was_grounded = true
 	else:
 		was_grounded = false
@@ -526,6 +732,11 @@ func start_crash() -> void:
 	if sfx_start and sfx_start.playing:
 		sfx_start.stop()
 	var at_water: bool = global_position.y < water_level + 0.2
+	
+	# IMMEDIATE COLLISION DISABLE
+	# Stop all physics interactions for the main body
+	collision_layer = 0
+	collision_mask = 0
 	
 	# Determine explosion position - Robust approach
 	# Use simple_box_size (calculated AABB) for accurate world sizing
@@ -902,6 +1113,10 @@ func _build_collision_for_node(root_node: Node3D, attach_node: Node3D) -> void:
 	for mi in meshes:
 		if mi.mesh == null:
 			continue
+		# Exclude rotors from collision to prevent weird physics on landing
+		if mi.name.to_lower().contains("rotor"):
+			continue
+		
 		var shape: Shape3D = mi.mesh.create_convex_shape()
 		if shape == null:
 			continue
