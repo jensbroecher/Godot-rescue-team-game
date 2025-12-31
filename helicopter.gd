@@ -541,16 +541,18 @@ func _physics_process(delta: float) -> void:
 	# Controller Input
 	var deadzone: float = 0.2
 	
-	# Left Stick: Movement (Forward/Back/Left/Right)
+	# Left Stick: Movement (Forward/Back)
 	var joy_y = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
 	var joy_x = Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
+	var joy_rx = Input.get_joy_axis(0, JOY_AXIS_RIGHT_X)
 	
 	if abs(joy_y) > deadzone:
 		# Invert Y because negative axis is usually up/forward
 		input_velocity += horizontal_forward * current_move_speed * -joy_y
 		
-	if abs(joy_x) > deadzone:
-		input_velocity += horizontal_right * current_move_speed * joy_x
+	# Right Stick: Strafing (Left/Right)
+	if abs(joy_rx) > deadzone:
+		input_velocity += horizontal_right * current_move_speed * joy_rx
 
 	# Triggers: Lift
 	var trigger_right = Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT)
@@ -671,10 +673,10 @@ func _physics_process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_D):
 			rot -= turn_speed * delta
 			
-		# Controller Right Stick: Rotation
-		var joy_rx = Input.get_joy_axis(0, JOY_AXIS_RIGHT_X)
-		if abs(joy_rx) > 0.2: # Deadzone
-			rot -= turn_speed * delta * joy_rx * 2.0 # Multiplier for sensitivity
+		# Controller Left Stick: Rotation (Steering)
+		# joy_x is already read above
+		if abs(joy_x) > 0.2: # Deadzone
+			rot -= turn_speed * delta * joy_x * 2.0 # Multiplier for sensitivity
 			
 		if rot != 0.0:
 			rotate_y(rot)
